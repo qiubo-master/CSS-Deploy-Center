@@ -1,0 +1,46 @@
+name: Deploy Control Center
+
+on:
+  workflow_dispatch:
+  workflow_run:
+    workflows: ["Control Center CI"]
+    types: [completed]
+    branches: [main]
+
+concurrency:
+  group: control-center-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          SSH_HOST_KEY: ${{ secrets.DEPLOY_HOST_KEY }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$SSH_HOST_KEY" > ~/.ssh/known_hosts
+      - name: Upload release
+        env:
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          PORT: ${{ secrets.DEPLOY_PORT }}
+          USER: ${{ secrets.DEPLOY_USER }}
+        run: |
+          tar --exclude=.git --exclude=node_modules -czf /tmp/control-center.tgz .
+          scp -i ~/.ssh/deploy_key -P "$PORT" /tmp/control-center.tgz "$USER@$HOST:/tmp/control-center-${GITHUB_SHA}.tgz"
+      - name: Activate release
+        env:
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          PORT: ${{ secrets.DEPLOY_PORT }}
+          USER: ${{ secrets.DEPLOY_USER }}
+        run: |
+          ssh -i ~/.ssh/deploy_key -p "$PORT" "$USER@$HOST" \
+            "RELEASE_SHA=$GITHUB_SHA ARCHIVE=/tmp/control-center-${GITHUB_SHA}.tgz bash -s" \
+            < ops/deploy-control-center.sh

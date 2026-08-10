@@ -1,0 +1,61 @@
+name: Deploy CSS
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      action:
+        description: deploy or rollback
+        required: true
+        default: deploy
+
+concurrency:
+  group: css-production
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - run: pip install -e local-demo
+      - run: LLM_MODE=mock pytest -q local-demo/tests
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          SSH_HOST_KEY: ${{ secrets.DEPLOY_HOST_KEY }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$SSH_HOST_KEY" > ~/.ssh/known_hosts
+      - name: Upload application
+        if: inputs.action != 'rollback'
+        env:
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          PORT: ${{ secrets.DEPLOY_PORT }}
+          USER: ${{ secrets.DEPLOY_USER }}
+        run: |
+          tar --exclude=.git --exclude=.venv -czf /tmp/css.tgz local-demo
+          scp -i ~/.ssh/deploy_key -P "$PORT" /tmp/css.tgz "$USER@$HOST:/tmp/css-${GITHUB_SHA}.tgz"
+      - name: Deploy or rollback
+        env:
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          PORT: ${{ secrets.DEPLOY_PORT }}
+          USER: ${{ secrets.DEPLOY_USER }}
+          ACTION: ${{ inputs.action || 'deploy' }}
+        run: |
+          ssh -i ~/.ssh/deploy_key -p "$PORT" "$USER@$HOST" \
+            "ACTION=$ACTION RELEASE_SHA=$GITHUB_SHA ARCHIVE=/tmp/css-${GITHUB_SHA}.tgz bash -s" \
+            < templates/css-repository/deploy-blue-green.sh
