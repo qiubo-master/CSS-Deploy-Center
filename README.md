@@ -50,6 +50,29 @@ Media 仓库需配置与控制台相同的部署 Secrets：`DEPLOY_HOST`、`DEPL
 
 当前 Media 已完成首次资源下发，除非要扩缩容或更换端口，否则不要重复使用此功能。
 
+## 多服务器与资源监控
+
+控制台以“项目”为一级视图：一个项目可以绑定多个部署目标，一台服务器也可以承载多个项目。部署目标通过 `SERVER_INVENTORY_JSON` 配置，支持普通云服务器、裸金属和 AutoDL；每个目标包含稳定 ID、名称、厂商、区域、地址、监控地址和允许部署的项目。
+
+每台 Linux 服务器运行只读代理 `ops/resource-agent.py`，采集 CPU、内存、磁盘；检测到 NVIDIA 驱动时额外采集 GPU 使用率和显存。代理只监听 `127.0.0.1:9108`，应通过 VPN、内网或 HTTPS Nginx 反向代理供控制中心访问，不要将无 TLS 的代理端口直接暴露到公网。
+
+```bash
+sudo install -m 750 ops/resource-agent.py /usr/local/bin/forgeops-resource-agent
+sudo env FORGEOPS_MONITOR_TOKEN='生成的独立随机令牌' \
+  FORGEOPS_MONITOR_PORT=9108 \
+  /usr/local/bin/forgeops-resource-agent
+```
+
+生产环境应将上述命令配置为 systemd 服务，并在控制中心设置：
+
+```dotenv
+MONITOR_AGENT_TOKEN=所有代理共用或经网关转换的只读令牌
+ALIYUN_MONITOR_URL=https://monitor.example.com/v1/resources
+SERVER_INVENTORY_JSON=[{"id":"aliyun-main","name":"阿里云生产服务器","provider":"阿里云","kind":"cloud","region":"cn-hangzhou","address":"47.120.76.166","monitorUrl":"https://monitor.example.com/v1/resources","projectIds":["css","media"]},{"id":"autodl-gpu-1","name":"AutoDL GPU 01","provider":"AutoDL","kind":"autodl","region":"西北","address":"实例地址","monitorUrl":"https://autodl-agent.example.com/v1/resources","projectIds":["media"]}]
+```
+
+下发前容量判断采用保守策略：请求资源之外至少保留 20% CPU、20% 内存和 5GB 磁盘空间。监控未接入、目标离线或余量不足时，控制台禁用资源下发；日常向已部署目标发布新版本不受首次资源下发按钮影响。
+
 ## 本地运行
 
 ```bash

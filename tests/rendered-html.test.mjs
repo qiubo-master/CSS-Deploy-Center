@@ -26,6 +26,8 @@ test("server-renders the CI/CD control center", async () => {
   assert.match(html, /新建发布流水线/);
   assert.match(html, /回滚上一版本/);
   assert.match(html, /序章自媒体中台/);
+  assert.match(html, /项目管理/);
+  assert.match(html, /云服务器与 AutoDL 资源监控/);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape|react-loading-skeleton/);
 });
 
@@ -37,6 +39,8 @@ test("control-center API returns a usable demo dashboard", async () => {
   assert.equal(body.mode, "demo");
   assert.equal(body.project.repository, "qiubo-master/Media");
   assert.equal(body.projects.length, 2);
+  assert.ok(Array.isArray(body.servers));
+  assert.equal(body.servers[0].capacity.eligible, false);
   assert.equal(body.resourceProfiles.length, 3);
   assert.ok(Array.isArray(body.pipelines));
   assert.ok(body.version);

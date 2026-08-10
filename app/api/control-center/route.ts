@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { deploymentProjects, getProject } from "../../../lib/deployment-projects";
+import { assessCapacity, monitorTarget, serverTargets } from "../../../lib/infrastructure";
 
 export const dynamic = "force-dynamic";
 
@@ -67,8 +68,13 @@ function demoRuns(projectId: string) {
 
 export async function GET(request: NextRequest) {
   const selected = getProject(request.nextUrl.searchParams.get("project"));
+  const targets = serverTargets();
   const [owner, repo] = selected.repository.split("/");
   const health = await checkHealth(selected.healthUrl);
+  const monitoredServers = await Promise.all(targets.map(async (target) => {
+    const monitor = await monitorTarget(target);
+    return { ...target, ...monitor, capacity: assessCapacity(monitor.snapshot, { cpu: 2, memoryMb: 3072, diskGb: 10 }) };
+  }));
   let runs: GitHubRun[] = [];
   let latestCommit: { sha: string; message: string; author: string; date: string; url: string } | null = null;
   let mode: "demo" | "live" = "demo";
@@ -121,8 +127,10 @@ export async function GET(request: NextRequest) {
       description: project.description,
       endpoint: project.endpoint,
       resourceManaged: project.resourceManaged,
+      targetIds: project.targetIds,
     })),
     project: selected,
+    servers: monitoredServers,
     service: { ...health, version: latestSuccessfulDeploy?.head_sha.slice(0, 7) ?? (selected.id === "media" ? "待发布" : "current"), endpoint: selected.endpoint },
     version: {
       latest: latestCommit,
@@ -167,6 +175,8 @@ export async function POST(request: NextRequest) {
   if (!["deploy", "release", "rollback"].includes(input.action)) return NextResponse.json({ message: "不支持的操作" }, { status: 400 });
 
   const project = getProject(input.projectId);
+  const target = serverTargets().find((item) => item.id === input.targetId) ?? serverTargets().find((item) => project.targetIds.includes(item.id));
+  if (!target || !project.targetIds.includes(target.id)) return NextResponse.json({ message: "该项目未绑定此部署目标" }, { status: 400 });
   const profiles = {
     small: { cpu: "1.0", memory: "1g", database_memory: "512m" },
     standard: { cpu: "2.0", memory: "2g", database_memory: "1g" },

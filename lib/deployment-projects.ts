@@ -10,6 +10,7 @@ export type DeploymentProject = {
   healthUrl?: string;
   endpoint: string;
   resourceManaged: boolean;
+  targetIds: string[];
 };
 
 export const deploymentProjects: DeploymentProject[] = [
@@ -23,6 +24,7 @@ export const deploymentProjects: DeploymentProject[] = [
     healthUrl: process.env.CSS_HEALTH_URL,
     endpoint: process.env.CSS_PUBLIC_URL ?? "等待配置访问地址",
     resourceManaged: false,
+    targetIds: ["aliyun-main"],
   },
   {
     id: "media",
@@ -34,6 +36,7 @@ export const deploymentProjects: DeploymentProject[] = [
     healthUrl: process.env.MEDIA_HEALTH_URL,
     endpoint: process.env.MEDIA_PUBLIC_URL ?? "http://共享公网IP:8080",
     resourceManaged: true,
+    targetIds: ["aliyun-main"],
   },
 ];
 
