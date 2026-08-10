@@ -1,27 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { deploymentProjects, getProject } from "../../../lib/deployment-projects";
 
 export const dynamic = "force-dynamic";
-
-const fallback = {
-  mode: "demo",
-  project: { name: "轮胎智能客服", repository: "qiubo-master/CSS", environment: "Production", branch: "main" },
-  service: { status: "healthy", version: "08fe261", endpoint: "等待配置阿里云地址", uptime: "6h 42m", latency: "38 ms" },
-  server: { status: "online", cpu: 18, memory: 36, disk: 21, gpu: 0, vram: 58 },
-  models: [
-    { name: "Qwen3-8B", state: "Ready", processor: "100% GPU", memory: "7.0 GB" },
-    { name: "Qwen3-Embedding 0.6B", state: "Ready", processor: "100% GPU", memory: "1.8 GB" },
-  ],
-  pipeline: { id: "run-184", status: "success", commit: "08fe261", actor: "qiubo-master", startedAt: "今天 03:58", stages: [
-    { name: "代码检出", state: "success", duration: "4s" }, { name: "自动测试", state: "success", duration: "13s" },
-    { name: "构建制品", state: "success", duration: "21s" }, { name: "部署绿色实例", state: "success", duration: "18s" },
-    { name: "健康检查", state: "success", duration: "7s" }, { name: "切换流量", state: "success", duration: "2s" },
-  ]},
-  releases: [
-    { id: "r5", version: "08fe261", commit: "restrict human handoff", branch: "main", status: "运行中", actor: "qiubo-master", time: "今天 03:58", duration: "1m 05s" },
-    { id: "r4", version: "0a02262", commit: "expose on port 6006", branch: "main", status: "已归档", actor: "qiubo-master", time: "昨天 23:42", duration: "54s" },
-    { id: "r3", version: "8d9e912", commit: "GPU compatible inference", branch: "main", status: "已归档", actor: "qiubo-master", time: "昨天 22:17", duration: "1m 12s" },
-  ],
-};
 
 type GitHubRun = {
   id: number;
@@ -38,77 +18,23 @@ type GitHubRun = {
   actor?: { login?: string };
 };
 
-const headers = () => ({
+const githubHeaders = () => ({
   Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
   Accept: "application/vnd.github+json",
   "X-GitHub-Api-Version": "2022-11-28",
   "Content-Type": "application/json",
 });
 
-function config() {
-  const repository = process.env.GITHUB_REPOSITORY ?? "qiubo-master/CSS";
-  const [owner, repo] = repository.split("/");
-  return { owner, repo, repository, workflow: process.env.GITHUB_WORKFLOW_FILE ?? "deploy.yml" };
-}
-
 function authorize(request: NextRequest) {
   const expected = process.env.CONTROL_CENTER_ADMIN_TOKEN;
-  return !expected || request.headers.get("x-admin-token") === expected;
+  const supplied = request.headers.get("x-admin-token") ?? request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
+  return !expected || supplied === expected;
 }
 
-export async function GET() {
-  if (!process.env.GITHUB_TOKEN) return NextResponse.json(fallback);
-  const { owner, repo, repository } = config();
-  try {
-    const [runsResponse, healthResult] = await Promise.all([
-      fetch(`https://api.github.com/repos/${owner}/${repo}/actions/runs?per_page=8`, { headers: headers(), cache: "no-store" }),
-      checkHealth(),
-    ]);
-    if (!runsResponse.ok) throw new Error(`GitHub ${runsResponse.status}`);
-    const body = await runsResponse.json();
-    const runs: GitHubRun[] = body.workflow_runs ?? [];
-    const latest = runs[0];
-    const releases = runs.slice(0, 6).map((run, index) => ({
-      id: String(run.id), version: String(run.head_sha ?? "").slice(0, 7), commit: run.display_title || run.name,
-      branch: run.head_branch, status: index === 0 && run.conclusion === "success" ? "运行中" : run.conclusion === "success" ? "已归档" : run.conclusion || run.status,
-      actor: run.actor?.login ?? "unknown", time: new Date(run.created_at).toLocaleString("zh-CN"), duration: elapsed(run.run_started_at, run.updated_at),
-    }));
-    return NextResponse.json({
-      ...fallback, mode: "live", project: { ...fallback.project, repository },
-      service: { ...fallback.service, ...healthResult, version: latest?.head_sha?.slice(0, 7) ?? "unknown" },
-      pipeline: latest ? {
-        id: `run-${latest.run_number}`, status: latest.conclusion ?? latest.status, commit: latest.head_sha.slice(0, 7),
-        actor: latest.actor?.login ?? "unknown", startedAt: new Date(latest.created_at).toLocaleString("zh-CN"),
-        stages: stagesFor(latest.status, latest.conclusion),
-      } : fallback.pipeline,
-      releases: releases.length ? releases : fallback.releases,
-    });
-  } catch (error) {
-    return NextResponse.json({ ...fallback, service: { ...fallback.service, status: "degraded" }, error: error instanceof Error ? error.message : "status unavailable" });
-  }
-}
-
-export async function POST(request: NextRequest) {
-  if (!authorize(request)) return NextResponse.json({ message: "无权执行发布操作" }, { status: 401 });
-  const input = await request.json();
-  if (!["deploy", "rollback"].includes(input.action)) return NextResponse.json({ message: "不支持的操作" }, { status: 400 });
-  if (!process.env.GITHUB_TOKEN) return NextResponse.json({ message: `演示模式：已模拟触发${input.action === "deploy" ? "部署" : "回滚"}流水线` });
-  const { owner, repo, workflow } = config();
-  const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/actions/workflows/${workflow}/dispatches`, {
-    method: "POST", headers: headers(), body: JSON.stringify({ ref: input.branch || "main", inputs: { action: input.action } }),
-  });
-  if (!response.ok) return NextResponse.json({ message: `GitHub Actions 触发失败：${response.status}` }, { status: 502 });
-  return NextResponse.json({ message: `${input.action === "deploy" ? "部署" : "回滚"}流水线已触发，请稍后刷新状态` });
-}
-
-async function checkHealth() {
-  const endpoint = process.env.TARGET_HEALTH_URL;
-  if (!endpoint) return {};
-  const started = Date.now();
-  try {
-    const response = await fetch(endpoint, { signal: AbortSignal.timeout(5000), cache: "no-store" });
-    return { status: response.ok ? "healthy" : "degraded", endpoint: endpoint.replace(/\/api\/v1\/health$/, ""), latency: `${Date.now() - started} ms` };
-  } catch { return { status: "offline", endpoint, latency: "timeout" }; }
+function stagesFor(status: string, conclusion: string | null) {
+  const names = ["代码检出", "自动测试", "构建制品", "下发资源", "健康检查", "激活版本"];
+  if (status === "completed") return names.map((name) => ({ name, state: conclusion === "success" ? "success" : "failed" }));
+  return names.map((name, index) => ({ name, state: index === 0 ? "running" : "pending" }));
 }
 
 function elapsed(start?: string, end?: string) {
@@ -117,8 +43,129 @@ function elapsed(start?: string, end?: string) {
   return seconds > 59 ? `${Math.floor(seconds / 60)}m ${seconds % 60}s` : `${seconds}s`;
 }
 
-function stagesFor(status: string, conclusion: string | null) {
-  const names = ["代码检出", "自动测试", "构建制品", "部署绿色实例", "健康检查", "切换流量"];
-  if (status === "completed") return names.map(name => ({ name, state: conclusion === "success" ? "success" : "failed" }));
-  return names.map((name, index) => ({ name, state: index === 0 ? "running" : "pending" }));
+async function checkHealth(url?: string) {
+  if (!url) return { status: "unknown", latency: "—" };
+  const started = Date.now();
+  try {
+    const response = await fetch(url, { signal: AbortSignal.timeout(5000), cache: "no-store" });
+    return { status: response.ok ? "healthy" : "degraded", latency: `${Date.now() - started} ms` };
+  } catch {
+    return { status: "offline", latency: "timeout" };
+  }
+}
+
+function demoRuns(projectId: string) {
+  return projectId === "media" ? [
+    { id: "media-ready", version: "待发布", commit: "资源编排已就绪", branch: "main", status: "待下发", actor: "ForgeOps", time: "现在", duration: "—" },
+  ] : [
+    { id: "css-live", version: "current", commit: "现有生产版本", branch: "main", status: "运行中", actor: "qiubo-master", time: "已部署", duration: "—" },
+  ];
+}
+
+export async function GET(request: NextRequest) {
+  const selected = getProject(request.nextUrl.searchParams.get("project"));
+  const [owner, repo] = selected.repository.split("/");
+  const health = await checkHealth(selected.healthUrl);
+  let runs: GitHubRun[] = [];
+  let mode: "demo" | "live" = "demo";
+  let error: string | undefined;
+
+  if (process.env.GITHUB_TOKEN) {
+    try {
+      const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/actions/runs?per_page=8`, {
+        headers: githubHeaders(), cache: "no-store",
+      });
+      if (!response.ok) throw new Error(`GitHub API ${response.status}`);
+      runs = (await response.json()).workflow_runs ?? [];
+      mode = "live";
+    } catch (cause) {
+      error = cause instanceof Error ? cause.message : "GitHub 状态不可用";
+    }
+  }
+
+  const latest = runs[0];
+  const releases = runs.length ? runs.slice(0, 6).map((run, index) => ({
+    id: String(run.id),
+    version: run.head_sha.slice(0, 7),
+    commit: run.display_title || run.name,
+    branch: run.head_branch,
+    status: index === 0 && run.conclusion === "success" ? "运行中" : run.conclusion === "success" ? "已归档" : run.conclusion || run.status,
+    actor: run.actor?.login ?? "unknown",
+    time: new Date(run.created_at).toLocaleString("zh-CN"),
+    duration: elapsed(run.run_started_at, run.updated_at),
+  })) : demoRuns(selected.id);
+
+  return NextResponse.json({
+    mode,
+    projects: deploymentProjects.map((project) => ({
+      id: project.id,
+      name: project.name,
+      repository: project.repository,
+      branch: project.branch,
+      description: project.description,
+      endpoint: project.endpoint,
+      resourceManaged: project.resourceManaged,
+    })),
+    project: selected,
+    service: { ...health, version: latest?.head_sha.slice(0, 7) ?? (selected.id === "media" ? "待发布" : "current"), endpoint: selected.endpoint },
+    pipeline: latest ? {
+      id: `run-${latest.run_number}`,
+      status: latest.conclusion ?? latest.status,
+      commit: latest.head_sha.slice(0, 7),
+      actor: latest.actor?.login ?? "unknown",
+      startedAt: new Date(latest.created_at).toLocaleString("zh-CN"),
+      stages: stagesFor(latest.status, latest.conclusion),
+    } : { id: "ready", status: "ready", commit: "—", actor: "ForgeOps", startedAt: "尚未执行", stages: stagesFor("queued", null) },
+    releases,
+    resourceProfiles: selected.resourceManaged ? [
+      { id: "small", name: "轻量", cpu: "1.0", memory: "1g", databaseMemory: "512m", note: "体验和小流量" },
+      { id: "standard", name: "标准", cpu: "2.0", memory: "2g", databaseMemory: "1g", note: "推荐生产配置" },
+      { id: "large", name: "增强", cpu: "4.0", memory: "4g", databaseMemory: "2g", note: "高并发内容生产" },
+    ] : [],
+    error,
+  });
+}
+
+export async function POST(request: NextRequest) {
+  if (!authorize(request)) return NextResponse.json({ message: "管理员令牌无效" }, { status: 401 });
+  const input = await request.json();
+  if (!['deploy', 'rollback'].includes(input.action)) return NextResponse.json({ message: "不支持的操作" }, { status: 400 });
+
+  const project = getProject(input.projectId);
+  const profiles = {
+    small: { cpu: "1.0", memory: "1g", database_memory: "512m" },
+    standard: { cpu: "2.0", memory: "2g", database_memory: "1g" },
+    large: { cpu: "4.0", memory: "4g", database_memory: "2g" },
+  } as const;
+  const profileName = input.resourceProfile in profiles ? input.resourceProfile as keyof typeof profiles : "standard";
+  const port = Number(input.hostPort ?? 8080);
+  if (project.id === "media" && (!Number.isInteger(port) || port < 1024 || port > 65535)) {
+    return NextResponse.json({ message: "服务端口必须在 1024–65535 之间" }, { status: 400 });
+  }
+
+  if (!process.env.GITHUB_TOKEN) {
+    return NextResponse.json({ message: `演示模式：已模拟${input.action === "deploy" ? "下发" : "回滚"}${project.name}` });
+  }
+
+  const [owner, repo] = project.repository.split("/");
+  const workflowInputs: Record<string, string> = { action: input.action };
+  if (project.id === "media") Object.assign(workflowInputs, {
+    resource_profile: profileName,
+    app_cpu: profiles[profileName].cpu,
+    app_memory: profiles[profileName].memory,
+    database_memory: profiles[profileName].database_memory,
+    host_port: String(port),
+    bind_address: input.exposure === "gateway" ? "127.0.0.1" : "0.0.0.0",
+  });
+
+  const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/actions/workflows/${project.workflow}/dispatches`, {
+    method: "POST",
+    headers: githubHeaders(),
+    body: JSON.stringify({ ref: input.branch || project.branch, inputs: workflowInputs }),
+  });
+  if (!response.ok) {
+    const detail = await response.text();
+    return NextResponse.json({ message: `GitHub Actions 触发失败（${response.status}）`, detail }, { status: 502 });
+  }
+  return NextResponse.json({ message: `${project.name}${input.action === "deploy" ? "资源下发" : "回滚"}流水线已触发` });
 }

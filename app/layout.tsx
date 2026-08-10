@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "ForgeOps · CI/CD 发布控制中心",
-  description: "智能客服项目的发布、回滚、服务器与模型运行状态控制台。",
+  description: "多项目 Docker 资源下发、发布、健康检查与版本回滚控制台。",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

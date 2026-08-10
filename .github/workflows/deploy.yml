@@ -2,6 +2,13 @@ name: Deploy Control Center
 
 on:
   workflow_dispatch:
+    inputs:
+      action:
+        description: Deployment action
+        required: true
+        default: deploy
+        type: choice
+        options: [deploy, rollback]
   workflow_run:
     workflows: ["Control Center CI"]
     types: [completed]
@@ -28,6 +35,7 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           printf '%s\n' "$SSH_HOST_KEY" > ~/.ssh/known_hosts
       - name: Upload release
+        if: github.event_name != 'workflow_dispatch' || inputs.action == 'deploy'
         env:
           HOST: ${{ secrets.DEPLOY_HOST }}
           PORT: ${{ secrets.DEPLOY_PORT }}
@@ -36,6 +44,7 @@ jobs:
           tar --exclude=.git --exclude=node_modules -czf /tmp/control-center.tgz .
           scp -i ~/.ssh/deploy_key -P "$PORT" /tmp/control-center.tgz "$USER@$HOST:/tmp/control-center-${GITHUB_SHA}.tgz"
       - name: Activate release
+        if: github.event_name != 'workflow_dispatch' || inputs.action == 'deploy'
         env:
           HOST: ${{ secrets.DEPLOY_HOST }}
           PORT: ${{ secrets.DEPLOY_PORT }}
@@ -44,3 +53,11 @@ jobs:
           ssh -i ~/.ssh/deploy_key -p "$PORT" "$USER@$HOST" \
             "RELEASE_SHA=$GITHUB_SHA ARCHIVE=/tmp/control-center-${GITHUB_SHA}.tgz bash -s" \
             < ops/deploy-control-center.sh
+      - name: Roll back release
+        if: github.event_name == 'workflow_dispatch' && inputs.action == 'rollback'
+        env:
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          PORT: ${{ secrets.DEPLOY_PORT }}
+          USER: ${{ secrets.DEPLOY_USER }}
+        run: |
+          ssh -i ~/.ssh/deploy_key -p "$PORT" "$USER@$HOST" "bash -s" < ops/rollback-control-center.sh

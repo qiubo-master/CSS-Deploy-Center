@@ -19,9 +19,10 @@ test("server-renders the CI/CD control center", async () => {
   const html = await response.text();
   assert.match(html, /ForgeOps/);
   assert.match(html, /CI\/CD 发布控制中心/);
-  assert.match(html, /生产发布控制台/);
-  assert.match(html, /部署新版本/);
+  assert.match(html, /CI\/CD 发布与资源控制台/);
+  assert.match(html, /下发资源并部署/);
   assert.match(html, /回滚上一版本/);
+  assert.match(html, /序章自媒体中台/);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape|react-loading-skeleton/);
 });
 
@@ -31,9 +32,11 @@ test("control-center API returns a usable demo dashboard", async () => {
   assert.equal(response.status, 200);
   const body = await response.json();
   assert.equal(body.mode, "demo");
-  assert.equal(body.project.repository, "qiubo-master/CSS");
+  assert.equal(body.project.repository, "qiubo-master/Media");
+  assert.equal(body.projects.length, 2);
+  assert.equal(body.resourceProfiles.length, 3);
   assert.ok(body.pipeline.stages.length >= 6);
-  assert.ok(body.releases.length >= 3);
+  assert.ok(body.releases.length >= 1);
 });
 
 test("demo deployment and rollback actions are accepted", async () => {
@@ -42,7 +45,7 @@ test("demo deployment and rollback actions are accepted", async () => {
     const response = await app.fetch(new Request("http://localhost/api/control-center", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ action, branch: "main" }),
+      body: JSON.stringify({ action, projectId: "media", branch: "main", resourceProfile: "standard", hostPort: 8080 }),
     }), env, ctx);
     assert.equal(response.status, 200);
     assert.match((await response.json()).message, /演示模式/);
