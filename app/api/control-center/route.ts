@@ -16,6 +16,9 @@ type GitHubRun = {
   run_started_at?: string;
   updated_at?: string;
   actor?: { login?: string };
+  html_url?: string;
+  event?: string;
+  workflow_id?: number;
 };
 
 const githubHeaders = () => ({
@@ -67,16 +70,28 @@ export async function GET(request: NextRequest) {
   const [owner, repo] = selected.repository.split("/");
   const health = await checkHealth(selected.healthUrl);
   let runs: GitHubRun[] = [];
+  let latestCommit: { sha: string; message: string; author: string; date: string; url: string } | null = null;
   let mode: "demo" | "live" = "demo";
   let error: string | undefined;
 
   if (process.env.GITHUB_TOKEN) {
     try {
-      const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/actions/runs?per_page=8`, {
-        headers: githubHeaders(), cache: "no-store",
-      });
-      if (!response.ok) throw new Error(`GitHub API ${response.status}`);
-      runs = (await response.json()).workflow_runs ?? [];
+      const [runsResponse, commitResponse] = await Promise.all([
+        fetch(`https://api.github.com/repos/${owner}/${repo}/actions/runs?per_page=20`, { headers: githubHeaders(), cache: "no-store" }),
+        fetch(`https://api.github.com/repos/${owner}/${repo}/commits/${selected.branch}`, { headers: githubHeaders(), cache: "no-store" }),
+      ]);
+      if (!runsResponse.ok) throw new Error(`GitHub Actions API ${runsResponse.status}`);
+      runs = (await runsResponse.json()).workflow_runs ?? [];
+      if (commitResponse.ok) {
+        const commit = await commitResponse.json();
+        latestCommit = {
+          sha: String(commit.sha).slice(0, 7),
+          message: String(commit.commit?.message ?? "").split("\n")[0],
+          author: commit.author?.login ?? commit.commit?.author?.name ?? "unknown",
+          date: commit.commit?.committer?.date ?? "",
+          url: commit.html_url ?? `https://github.com/${selected.repository}/commit/${commit.sha}`,
+        };
+      }
       mode = "live";
     } catch (cause) {
       error = cause instanceof Error ? cause.message : "GitHub 状态不可用";
@@ -84,6 +99,7 @@ export async function GET(request: NextRequest) {
   }
 
   const latest = runs[0];
+  const latestSuccessfulDeploy = runs.find((run) => run.conclusion === "success" && /deploy/i.test(run.name));
   const releases = runs.length ? runs.slice(0, 6).map((run, index) => ({
     id: String(run.id),
     version: run.head_sha.slice(0, 7),
@@ -107,7 +123,12 @@ export async function GET(request: NextRequest) {
       resourceManaged: project.resourceManaged,
     })),
     project: selected,
-    service: { ...health, version: latest?.head_sha.slice(0, 7) ?? (selected.id === "media" ? "待发布" : "current"), endpoint: selected.endpoint },
+    service: { ...health, version: latestSuccessfulDeploy?.head_sha.slice(0, 7) ?? (selected.id === "media" ? "待发布" : "current"), endpoint: selected.endpoint },
+    version: {
+      latest: latestCommit,
+      deployed: latestSuccessfulDeploy?.head_sha.slice(0, 7) ?? null,
+      updateAvailable: Boolean(latestCommit && latestSuccessfulDeploy && !latestSuccessfulDeploy.head_sha.startsWith(latestCommit.sha)),
+    },
     pipeline: latest ? {
       id: `run-${latest.run_number}`,
       status: latest.conclusion ?? latest.status,
@@ -117,6 +138,20 @@ export async function GET(request: NextRequest) {
       stages: stagesFor(latest.status, latest.conclusion),
     } : { id: "ready", status: "ready", commit: "—", actor: "ForgeOps", startedAt: "尚未执行", stages: stagesFor("queued", null) },
     releases,
+    pipelines: runs.slice(0, 12).map((run) => ({
+      id: String(run.id),
+      number: run.run_number,
+      name: run.name,
+      status: run.status,
+      conclusion: run.conclusion,
+      commit: run.head_sha.slice(0, 7),
+      branch: run.head_branch,
+      event: run.event ?? "workflow_dispatch",
+      actor: run.actor?.login ?? "unknown",
+      createdAt: new Date(run.created_at).toLocaleString("zh-CN"),
+      duration: elapsed(run.run_started_at, run.updated_at),
+      url: run.html_url ?? `https://github.com/${selected.repository}/actions/runs/${run.id}`,
+    })),
     resourceProfiles: selected.resourceManaged ? [
       { id: "small", name: "轻量", cpu: "1.0", memory: "1g", databaseMemory: "512m", note: "体验和小流量" },
       { id: "standard", name: "标准", cpu: "2.0", memory: "2g", databaseMemory: "1g", note: "推荐生产配置" },
@@ -129,7 +164,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   if (!authorize(request)) return NextResponse.json({ message: "管理员令牌无效" }, { status: 401 });
   const input = await request.json();
-  if (!['deploy', 'rollback'].includes(input.action)) return NextResponse.json({ message: "不支持的操作" }, { status: 400 });
+  if (!["deploy", "release", "rollback"].includes(input.action)) return NextResponse.json({ message: "不支持的操作" }, { status: 400 });
 
   const project = getProject(input.projectId);
   const profiles = {
@@ -144,11 +179,13 @@ export async function POST(request: NextRequest) {
   }
 
   if (!process.env.GITHUB_TOKEN) {
-    return NextResponse.json({ message: `演示模式：已模拟${input.action === "deploy" ? "下发" : "回滚"}${project.name}` });
+    const demoAction = input.action === "release" ? "发布" : input.action === "deploy" ? "下发" : "回滚";
+    return NextResponse.json({ message: `演示模式：已模拟${demoAction}${project.name}` });
   }
 
   const [owner, repo] = project.repository.split("/");
-  const workflowInputs: Record<string, string> = { action: input.action };
+  const workflowAction = input.action === "release" ? "deploy" : input.action;
+  const workflowInputs: Record<string, string> = { action: workflowAction };
   if (project.id === "media") Object.assign(workflowInputs, {
     resource_profile: profileName,
     app_cpu: profiles[profileName].cpu,
@@ -167,5 +204,6 @@ export async function POST(request: NextRequest) {
     const detail = await response.text();
     return NextResponse.json({ message: `GitHub Actions 触发失败（${response.status}）`, detail }, { status: 502 });
   }
-  return NextResponse.json({ message: `${project.name}${input.action === "deploy" ? "资源下发" : "回滚"}流水线已触发` });
+  const actionLabel = input.action === "release" ? "版本发布" : input.action === "deploy" ? "资源下发" : "回滚";
+  return NextResponse.json({ message: `${project.name}${actionLabel}流水线已触发` });
 }
