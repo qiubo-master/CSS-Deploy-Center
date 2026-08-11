@@ -40,7 +40,8 @@ test("control-center API returns a usable demo dashboard", async () => {
   const body = await response.json();
   assert.equal(body.mode, "demo");
   assert.equal(body.project.repository, "qiubo-master/Media");
-  assert.equal(body.projects.length, 2);
+  assert.equal(body.projects.length, 3);
+  assert.ok(body.projects.some((project) => project.repository === "qiubo-master/AI_WMS"));
   assert.ok(Array.isArray(body.servers));
   assert.equal(body.servers[0].capacity.eligible, false);
   assert.equal(body.resourceProfiles.length, 3);

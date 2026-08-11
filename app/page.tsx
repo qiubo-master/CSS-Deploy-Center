@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-type Project = { id: "css" | "media"; name: string; repository: string; branch: string; description: string; endpoint: string; resourceManaged: boolean; targetIds: string[] };
+type ProjectId = "css" | "media" | "ai-wms";
+type Project = { id: ProjectId; name: string; repository: string; branch: string; description: string; endpoint: string; resourceManaged: boolean; targetIds: string[] };
 type Profile = { id: string; name: string; cpu: string; memory: string; databaseMemory: string; note: string };
 type Pipeline = { id: string; number: number; name: string; status: string; conclusion: string | null; commit: string; branch: string; event: string; actor: string; createdAt: string; duration: string; url: string };
 type ProjectUsage = { projectId: string; containerCount: number; cpuUsedPercent: number; memoryUsedMb: number; memoryLimitMb: number; containers: string[] };
@@ -24,6 +25,7 @@ const seed: Dashboard = {
   projects: [
     { id: "css", name: "智能客服", repository: "qiubo-master/CSS", branch: "main", description: "现有智能客服生产服务", endpoint: "等待配置", resourceManaged: false, targetIds: ["aliyun-main"] },
     { id: "media", name: "序章自媒体中台", repository: "qiubo-master/Media", branch: "main", description: "内容生产、账号矩阵与 AI 决策中台", endpoint: "http://47.120.76.166:8080", resourceManaged: true, targetIds: ["aliyun-main"] },
+    { id: "ai-wms", name: "AI供应链智能备货", repository: "qiubo-master/AI_WMS", branch: "main", description: "轮胎需求预测、库存监控与AI解释演示系统", endpoint: "http://47.120.61.139:3000", resourceManaged: false, targetIds: ["aliyun-ai-wms"] },
   ],
   project: { id: "media", name: "序章自媒体中台", repository: "qiubo-master/Media", branch: "main", description: "内容生产、账号矩阵与 AI 决策中台", endpoint: "http://47.120.76.166:8080", resourceManaged: true, targetIds: ["aliyun-main"] },
   service: { status: "healthy", version: "—", endpoint: "http://47.120.76.166:8080", latency: "—" },
@@ -46,7 +48,7 @@ function stateOf(run: Pipeline) {
 
 export default function Home() {
   const [data, setData] = useState(seed);
-  const [projectId, setProjectId] = useState<"css" | "media">("media");
+  const [projectId, setProjectId] = useState<ProjectId>("media");
   const [profile, setProfile] = useState("standard");
   const [hostPort, setHostPort] = useState("8080");
   const [exposure, setExposure] = useState<"direct" | "gateway">("direct");
@@ -74,7 +76,7 @@ export default function Home() {
     return () => { clearTimeout(initial); clearInterval(timer); };
   }, [load]);
 
-  const selectProject = (id: "css" | "media") => {
+  const selectProject = (id: ProjectId) => {
     const project = data.projects.find((item) => item.id === id);
     setProjectId(id); setTargetId(project?.targetIds[0] ?? ""); setNotice(""); setShowProvision(false); void load(id);
   };

@@ -1,4 +1,4 @@
-export type ProjectId = "css" | "media";
+export type ProjectId = "css" | "media" | "ai-wms";
 
 export type DeploymentProject = {
   id: ProjectId;
@@ -37,6 +37,18 @@ export const deploymentProjects: DeploymentProject[] = [
     endpoint: process.env.MEDIA_PUBLIC_URL ?? "http://共享公网IP:8080",
     resourceManaged: true,
     targetIds: ["aliyun-main"],
+  },
+  {
+    id: "ai-wms",
+    name: "AI供应链智能备货",
+    repository: process.env.AI_WMS_GITHUB_REPOSITORY ?? "qiubo-master/AI_WMS",
+    workflow: process.env.AI_WMS_GITHUB_WORKFLOW_FILE ?? "deploy.yml",
+    branch: "main",
+    description: "轮胎需求预测、库存监控与AI解释演示系统",
+    healthUrl: process.env.AI_WMS_HEALTH_URL ?? "http://47.120.61.139:3000/api/health",
+    endpoint: process.env.AI_WMS_PUBLIC_URL ?? "http://47.120.61.139:3000",
+    resourceManaged: false,
+    targetIds: ["aliyun-ai-wms"],
   },
 ];
 
