@@ -1,4 +1,4 @@
-export type ProjectId = "css" | "media" | "ai-wms";
+export type ProjectId = "css" | "media" | "ai-wms" | "ai-ops";
 
 export type DeploymentProject = {
   id: ProjectId;
@@ -48,7 +48,19 @@ export const deploymentProjects: DeploymentProject[] = [
     healthUrl: process.env.AI_WMS_HEALTH_URL ?? "http://47.120.61.139:3000/api/health",
     endpoint: process.env.AI_WMS_PUBLIC_URL ?? "http://47.120.61.139:3000",
     resourceManaged: false,
-    targetIds: ["aliyun-ai-wms"],
+    targetIds: ["aliyun2"],
+  },
+  {
+    id: "ai-ops",
+    name: "AI运营",
+    repository: process.env.AI_OPS_GITHUB_REPOSITORY ?? "qiubo-master/AI_OPS",
+    workflow: process.env.AI_OPS_GITHUB_WORKFLOW_FILE ?? "deploy.yml",
+    branch: "main",
+    description: "AI数字化培训、AI图像检测、AI维修诊断与AI保养报价",
+    healthUrl: process.env.AI_OPS_HEALTH_URL,
+    endpoint: process.env.AI_OPS_PUBLIC_URL ?? "等待首次发布",
+    resourceManaged: false,
+    targetIds: ["aliyun2"],
   },
 ];
 

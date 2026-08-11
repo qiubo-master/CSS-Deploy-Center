@@ -48,14 +48,6 @@ const defaultTargets: ServerTarget[] = [{
   monitorUrl: process.env.ALIYUN_MONITOR_URL ?? "http://host.docker.internal:9108/v1/resources",
   monitorToken: process.env.MONITOR_AGENT_TOKEN,
   projectIds: ["css", "media"],
-}, {
-  id: "aliyun-ai-wms",
-  name: "阿里云 AI WMS 服务器",
-  provider: "阿里云",
-  kind: "cloud",
-  region: "cn-hangzhou",
-  address: "47.120.61.139",
-  projectIds: ["ai-wms"],
 }];
 
 function validTargets(value: unknown): value is ServerTarget[] {
@@ -109,7 +101,7 @@ export async function monitorTarget(target: ServerTarget) {
 }
 
 export function projectUsage(snapshot: ResourceSnapshot | null) {
-  const aliases: Record<string, string> = { "media-platform": "media", "css-deploy-center": "deploy-center", "ai-wms": "ai-wms", css: "css" };
+  const aliases: Record<string, string> = { "media-platform": "media", "css-deploy-center": "deploy-center", "ai-wms": "ai-wms", "ai-ops": "ai-ops", css: "css" };
   const grouped = new Map<string, { projectId: string; containerCount: number; cpuUsedPercent: number; memoryUsedMb: number; memoryLimitMb: number; containers: string[] }>();
   for (const container of snapshot?.containers ?? []) {
     const projectId = aliases[container.composeProject] ?? container.composeProject ?? "other";
