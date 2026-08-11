@@ -69,6 +69,7 @@ function demoRuns(projectId: string) {
 export async function GET(request: NextRequest) {
   const selected = getProject(request.nextUrl.searchParams.get("project"));
   const targets = await serverTargets();
+  const selectedWithTargets = { ...selected, targetIds: targets.filter((target) => target.projectIds.includes(selected.id)).map((target) => target.id) };
   const [owner, repo] = selected.repository.split("/");
   const health = await checkHealth(selected.healthUrl);
   const monitoredServers = await Promise.all(targets.map(async (target) => {
@@ -127,9 +128,9 @@ export async function GET(request: NextRequest) {
       description: project.description,
       endpoint: project.endpoint,
       resourceManaged: project.resourceManaged,
-      targetIds: project.targetIds,
+      targetIds: targets.filter((target) => target.projectIds.includes(project.id)).map((target) => target.id),
     })),
-    project: selected,
+    project: selectedWithTargets,
     servers: monitoredServers,
     service: { ...health, version: latestSuccessfulDeploy?.head_sha.slice(0, 7) ?? (selected.id === "media" ? "待发布" : "current"), endpoint: selected.endpoint },
     version: {
@@ -177,7 +178,7 @@ export async function POST(request: NextRequest) {
   const project = getProject(input.projectId);
   const targets = await serverTargets();
   const target = targets.find((item) => item.id === input.targetId) ?? targets.find((item) => project.targetIds.includes(item.id));
-  if (!target || !project.targetIds.includes(target.id)) return NextResponse.json({ message: "该项目未绑定此部署目标" }, { status: 400 });
+  if (!target || !target.projectIds.includes(project.id)) return NextResponse.json({ message: "该项目未绑定此部署目标" }, { status: 400 });
   const profiles = {
     small: { cpu: "1.0", memory: "1g", database_memory: "512m" },
     standard: { cpu: "2.0", memory: "2g", database_memory: "1g" },

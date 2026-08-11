@@ -9,7 +9,7 @@ CONTROL_ENV="$ROOT/shared/.env"
 install -m 750 "$AGENT_SOURCE" /usr/local/bin/forgeops-resource-agent
 install -d -m 700 "$ROOT/shared"
 token="$(openssl rand -hex 32)"
-monitor_bind="${FORGEOPS_MONITOR_BIND:-172.18.0.1}"
+monitor_bind="${FORGEOPS_MONITOR_BIND:-172.17.0.1}"
 printf 'FORGEOPS_MONITOR_TOKEN=%s\nFORGEOPS_MONITOR_PORT=9108\nFORGEOPS_MONITOR_BIND=%s\n' "$token" "$monitor_bind" > "$AGENT_ENV"
 chmod 600 "$AGENT_ENV"
 
