@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-type ProjectId = "css" | "media" | "ai-wms" | "ai-ops";
+type ProjectId = string;
 type Project = { id: ProjectId; name: string; repository: string; branch: string; description: string; endpoint: string; resourceManaged: boolean; targetIds: string[] };
 type Profile = { id: string; name: string; cpu: string; memory: string; databaseMemory: string; note: string };
 type Pipeline = { id: string; number: number; name: string; status: string; conclusion: string | null; commit: string; branch: string; event: string; actor: string; createdAt: string; duration: string; url: string };
@@ -15,6 +15,7 @@ type Dashboard = {
   service: { status: string; version: string; endpoint: string; latency: string };
   version: { latest: null | { sha: string; message: string; author: string; date: string; url: string }; deployed: string | null; updateAvailable: boolean };
   pipelines: Pipeline[];
+  latestSteps: { name: string; status: string; conclusion: string | null; number: number }[];
   resourceProfiles: Profile[];
   servers: Server[];
   error?: string;
@@ -32,6 +33,7 @@ const seed: Dashboard = {
   service: { status: "healthy", version: "—", endpoint: "http://47.120.76.166:8080", latency: "—" },
   version: { latest: null, deployed: null, updateAvailable: false },
   pipelines: [],
+  latestSteps: [],
   resourceProfiles: [
     { id: "small", name: "轻量", cpu: "1.0", memory: "1g", databaseMemory: "512m", note: "体验和小流量" },
     { id: "standard", name: "标准", cpu: "2.0", memory: "2g", databaseMemory: "1g", note: "推荐生产配置" },
@@ -60,6 +62,9 @@ export default function Home() {
   const [targetId, setTargetId] = useState("aliyun-main");
   const [showServerForm, setShowServerForm] = useState(false);
   const [serverForm, setServerForm] = useState({ id: "", name: "", provider: "阿里云", kind: "cloud", region: "", address: "", monitorUrl: "", monitorToken: "", projectIds: ["media"] as string[] });
+  const [projectForm, setProjectForm] = useState({ id: "", name: "", repository: "", branch: "main", targetId: "aliyun2", workflow: "deploy.yml", endpoint: "", healthUrl: "", description: "", bootstrapWorkflow: true, deployNow: true, resourceProfile: "standard", hostPort: "8080", exposure: "direct" });
+  const [onboardingBusy, setOnboardingBusy] = useState(false);
+  const [onboardingResult, setOnboardingResult] = useState<{ workflowReady: boolean; deploymentTriggered: boolean; deploymentError?: string; checks: { path: string; ok: boolean }[]; secretsRequired: string[] } | null>(null);
 
   const load = useCallback(async (selected = projectId) => {
     try {
@@ -109,6 +114,17 @@ export default function Home() {
     finally { setBusy(null); }
   };
 
+  const addProject = async () => {
+    setOnboardingBusy(true); setNotice(""); setOnboardingResult(null); sessionStorage.setItem("forgeops-admin-token", adminToken);
+    try {
+      const response = await fetch("/api/projects", { method: "POST", headers: { "Content-Type": "application/json", ...(adminToken ? { "x-admin-token": adminToken } : {}) }, body: JSON.stringify(projectForm) });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message || "项目接入失败");
+      setNotice(result.message); setOnboardingResult(result); await load(projectForm.id);
+    } catch (error) { setNotice(error instanceof Error ? error.message : "项目接入失败"); }
+    finally { setOnboardingBusy(false); }
+  };
+
   const selectedProfile = useMemo(() => data.resourceProfiles.find((item) => item.id === profile), [data.resourceProfiles, profile]);
   const latestRun = data.pipelines[0];
   const latestState = latestRun ? stateOf(latestRun) : null;
@@ -118,7 +134,7 @@ export default function Home() {
   return <main className="shell">
     <aside className="sidebar">
       <div className="brand"><span className="brandMark">F</span><div><b>ForgeOps</b><small>Release Center</small></div></div>
-      <nav aria-label="主导航"><a className="active" href="#projects"><span>◇</span>项目管理</a><a href="#servers"><span>▦</span>服务器</a><a href="#release"><span>↑</span>版本发布</a><a href="#pipelines"><span>≋</span>流水线</a></nav>
+      <nav aria-label="主导航"><a className="active" href="#projects"><span>◇</span>项目管理</a><a href="#onboarding"><span>＋</span>接入向导</a><a href="#servers"><span>▦</span>服务器</a><a href="#release"><span>↑</span>版本发布</a><a href="#pipelines"><span>≋</span>流水线</a></nav>
       <div className="sideFoot"><span className="avatar">QB</span><div><b>qiubo-master</b><small>生产管理员</small></div></div>
     </aside>
 
@@ -127,6 +143,13 @@ export default function Home() {
       <div className="content">
         <section id="projects" className="overviewHead"><div><span className="kicker">PROJECT PORTFOLIO</span><h2>项目管理</h2><p>以项目为中心管理代码仓库、部署目标、运行状态和发布流水线。</p></div><span>{data.projects.length} 个项目 · {data.servers.length} 台服务器</span></section>
         <section className="projectStrip" aria-label="部署项目">{data.projects.map((project) => { const bound = data.servers.filter((server) => project.targetIds.includes(server.id)); return <button key={project.id} className={projectId === project.id ? "projectCard selected" : "projectCard"} onClick={() => selectProject(project.id)}><span>{project.id === "media" ? "ME" : "AI"}</span><div><b>{project.name}</b><small>{project.repository}</small><small>{bound.length} 个部署目标 · {project.endpoint}</small></div><em>{projectId === project.id ? "当前项目" : "查看项目"}</em></button>})}</section>
+
+        <section className="panel onboardingPanel" id="onboarding">
+          <div className="panelHead"><div><span className="kicker">ONBOARDING WIZARD</span><h3>资源接入与一键部署</h3></div><span className="sharedBadge">按步骤执行</span></div>
+          <div className="onboardingSteps"><article><b>1</b><div><strong>接入计算资源</strong><span>服务器需可 SSH 登录，安装 Docker、Compose、Python 3；监控代理只允许内网或加密隧道访问。</span></div></article><article><b>2</b><div><strong>确认代码仓库</strong><span>仓库至少包含一个提交，以及 Dockerfile 或 docker-compose.yml；Token 需要 Actions 写入和 Contents 读写权限。</span></div></article><article><b>3</b><div><strong>配置资源与目标</strong><span>选择目标服务器、CPU/内存档位、服务端口及健康检查地址，系统绑定项目与资源。</span></div></article><article><b>4</b><div><strong>建立流水线并发布</strong><span>自动检查或创建 deploy.yml；Secrets 完成后即可一键发布，并在流水线列表实时观察。</span></div></article></div>
+          <div className="rules"><b>接入规则</b><span>禁止提交 SSH 私钥和业务 .env</span><span>数据库端口不得暴露公网</span><span>生产服务必须配置健康检查</span><span>资源不足或监控离线时禁止首次下发</span></div>
+          <div className="projectOnboardingForm"><h4>新建项目部署</h4><div className="formGrid"><label>项目 ID<input value={projectForm.id} onChange={(event) => setProjectForm({ ...projectForm, id: event.target.value.toLowerCase() })} placeholder="ai-ops"/></label><label>项目名称<input value={projectForm.name} onChange={(event) => setProjectForm({ ...projectForm, name: event.target.value })} placeholder="AI运营"/></label><label>GitHub 仓库地址<input value={projectForm.repository} onChange={(event) => setProjectForm({ ...projectForm, repository: event.target.value })} placeholder="https://github.com/owner/repo"/></label><label>代码分支<input value={projectForm.branch} onChange={(event) => setProjectForm({ ...projectForm, branch: event.target.value })} placeholder="main"/></label><label>部署服务器<select value={projectForm.targetId} onChange={(event) => setProjectForm({ ...projectForm, targetId: event.target.value })}>{data.servers.map((server) => <option key={server.id} value={server.id}>{server.name} · {server.status === "online" ? "在线" : "未就绪"}</option>)}</select></label><label>资源规格<select value={projectForm.resourceProfile} onChange={(event) => setProjectForm({ ...projectForm, resourceProfile: event.target.value })}><option value="small">轻量 · 1 CPU / 1GB</option><option value="standard">标准 · 2 CPU / 2GB</option><option value="large">增强 · 4 CPU / 4GB</option></select></label><label>服务端口<input type="number" min="1024" max="65535" value={projectForm.hostPort} onChange={(event) => setProjectForm({ ...projectForm, hostPort: event.target.value })}/></label><label>暴露方式<select value={projectForm.exposure} onChange={(event) => setProjectForm({ ...projectForm, exposure: event.target.value })}><option value="direct">公网 IP + 独立端口</option><option value="gateway">统一 Nginx 网关</option></select></label><label>流水线文件<input value={projectForm.workflow} onChange={(event) => setProjectForm({ ...projectForm, workflow: event.target.value })} placeholder="deploy.yml"/></label><label>访问地址<input value={projectForm.endpoint} onChange={(event) => setProjectForm({ ...projectForm, endpoint: event.target.value })} placeholder="https://app.example.com"/></label><label>健康检查<input value={projectForm.healthUrl} onChange={(event) => setProjectForm({ ...projectForm, healthUrl: event.target.value })} placeholder="https://app.example.com/api/health"/></label></div><div className="checkRow"><label className="bootstrapCheck"><input type="checkbox" checked={projectForm.bootstrapWorkflow} onChange={(event) => setProjectForm({ ...projectForm, bootstrapWorkflow: event.target.checked })}/>缺少流水线时自动创建标准 `deploy.yml`</label><label className="bootstrapCheck"><input type="checkbox" checked={projectForm.deployNow} onChange={(event) => setProjectForm({ ...projectForm, deployNow: event.target.checked })}/>校验成功后立即触发第一次发布</label></div><div className="onboardingActions"><label>管理员令牌<input type="password" value={adminToken} onChange={(event) => setAdminToken(event.target.value)} placeholder="生产操作令牌"/></label><button className="releaseButton" onClick={addProject} disabled={onboardingBusy}>{onboardingBusy ? "正在建立并发布…" : "一键建立流水线并发布"}</button></div>{onboardingResult && <div className="readiness"><b>{onboardingResult.deploymentTriggered ? "首次发布已触发，请查看流水线" : onboardingResult.workflowReady ? "流水线已就绪" : "项目已登记，流水线待配置"}</b><div>{onboardingResult.checks.map((check) => <span key={check.path} className={check.ok ? "ok" : "missing"}>{check.ok ? "✓" : "!"} {check.path}</span>)}</div>{onboardingResult.deploymentError && <small className="errorText">{onboardingResult.deploymentError}</small>}<small>仓库 Secrets：{onboardingResult.secretsRequired.join("、")}</small></div>}</div>
+        </section>
 
         <section className="panel serverPanel" id="servers">
           <div className="panelHead"><div><span className="kicker">SERVER FLEET</span><h3>云服务器与 AutoDL 资源监控</h3></div><div className="serverActions"><span className="refreshNote">每 12 秒刷新 · 下发前保留安全余量</span><button className="secondary" onClick={() => setShowServerForm(!showServerForm)}>＋ 接入服务器</button></div></div>
@@ -142,6 +165,7 @@ export default function Home() {
 
         <section className="panel pipelinePanel" id="pipelines">
           <div className="panelHead"><div><span className="kicker">PIPELINE RUNS</span><h3>流水线列表</h3></div><div className="pipelineHeadActions">{latestState && <span className={`runState ${latestState.className}`}>最新：{latestState.text}</span>}<button className="secondary" onClick={() => trigger("release")} disabled={!!busy}>＋ 新建发布流水线</button></div></div>
+          {data.latestSteps.length > 0 && <div className="liveStages"><div><b>最新流水线实时阶段</b><span>页面每 12 秒自动同步 GitHub Actions</span></div><ol>{data.latestSteps.map((step) => <li key={`${step.number}-${step.name}`} className={step.status !== "completed" ? "running" : step.conclusion === "success" ? "success" : "failed"}><i>{step.status !== "completed" ? "↻" : step.conclusion === "success" ? "✓" : "!"}</i><span>{step.name}</span></li>)}</ol></div>}
           {data.pipelines.length ? <div className="pipelineTable"><div className="pipelineRow pipelineHeader"><span>流水线</span><span>版本</span><span>状态</span><span>触发方式</span><span>执行人</span><span>开始时间</span><span>耗时</span><span/></div>{data.pipelines.map((run) => { const state = stateOf(run); return <div className="pipelineRow" key={run.id}><span><b>{run.name}</b><small>#{run.number} · {run.branch}</small></span><code>{run.commit}</code><span><i className={`runState ${state.className}`}>{state.text}</i></span><span>{run.event === "workflow_dispatch" ? "手动发布" : run.event}</span><span>{run.actor}</span><span>{run.createdAt}</span><span>{run.duration}</span><a href={run.url} target="_blank" rel="noreferrer">详情 ↗</a></div>})}</div> : <div className="emptyPipelines"><b>暂无流水线</b><span>点击“新建发布流水线”开始第一次发布。</span></div>}
         </section>
 

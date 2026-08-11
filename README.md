@@ -1,5 +1,7 @@
 # ForgeOps · 多项目 CI/CD 发布控制中心
 
+完整的服务器接入、仓库配置、资源下发、流水线发布和故障处理步骤请查看 [ForgeOps CI/CD 中台操作手册](docs/操作手册.md)。
+
 面向 `qiubo-master/CSS` 与 `qiubo-master/Media` 的可视化发布工作台。它通过 GitHub Actions API 触发部署和回滚，并为 Media 下发 CPU、内存、数据库内存、公网端口和暴露模式。
 
 ## 当前线上入口

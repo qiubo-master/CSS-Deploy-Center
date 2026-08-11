@@ -67,7 +67,8 @@ function demoRuns(projectId: string) {
 }
 
 export async function GET(request: NextRequest) {
-  const selected = getProject(request.nextUrl.searchParams.get("project"));
+  const projects = await deploymentProjects();
+  const selected = await getProject(request.nextUrl.searchParams.get("project"));
   const targets = await serverTargets();
   const selectedWithTargets = { ...selected, targetIds: targets.filter((target) => target.projectIds.includes(selected.id)).map((target) => target.id) };
   const [owner, repo] = selected.repository.split("/");
@@ -106,6 +107,16 @@ export async function GET(request: NextRequest) {
   }
 
   const latest = runs[0];
+  let latestSteps: { name: string; status: string; conclusion: string | null; number: number }[] = [];
+  if (latest && process.env.GITHUB_TOKEN) {
+    try {
+      const jobsResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/actions/runs/${latest.id}/jobs?per_page=20`, { headers: githubHeaders(), cache: "no-store" });
+      if (jobsResponse.ok) {
+        const jobs = (await jobsResponse.json()).jobs ?? [];
+        latestSteps = jobs.flatMap((job: { name?: string; steps?: { name: string; status: string; conclusion: string | null; number: number }[] }) => (job.steps ?? []).map((step) => ({ ...step, name: `${job.name ?? "job"} · ${step.name}` })));
+      }
+    } catch { /* run list remains available */ }
+  }
   const latestSuccessfulDeploy = runs.find((run) => run.conclusion === "success" && /deploy/i.test(run.name));
   const releases = runs.length ? runs.slice(0, 6).map((run, index) => ({
     id: String(run.id),
@@ -120,7 +131,7 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json({
     mode,
-    projects: deploymentProjects.map((project) => ({
+    projects: projects.map((project) => ({
       id: project.id,
       name: project.name,
       repository: project.repository,
@@ -161,6 +172,7 @@ export async function GET(request: NextRequest) {
       duration: elapsed(run.run_started_at, run.updated_at),
       url: run.html_url ?? `https://github.com/${selected.repository}/actions/runs/${run.id}`,
     })),
+    latestSteps,
     resourceProfiles: selected.resourceManaged ? [
       { id: "small", name: "轻量", cpu: "1.0", memory: "1g", databaseMemory: "512m", note: "体验和小流量" },
       { id: "standard", name: "标准", cpu: "2.0", memory: "2g", databaseMemory: "1g", note: "推荐生产配置" },
@@ -175,7 +187,7 @@ export async function POST(request: NextRequest) {
   const input = await request.json();
   if (!["deploy", "release", "rollback"].includes(input.action)) return NextResponse.json({ message: "不支持的操作" }, { status: 400 });
 
-  const project = getProject(input.projectId);
+  const project = await getProject(input.projectId);
   const targets = await serverTargets();
   const target = targets.find((item) => item.id === input.targetId) ?? targets.find((item) => project.targetIds.includes(item.id));
   if (!target || !target.projectIds.includes(project.id)) return NextResponse.json({ message: "该项目未绑定此部署目标" }, { status: 400 });
@@ -198,7 +210,7 @@ export async function POST(request: NextRequest) {
   const [owner, repo] = project.repository.split("/");
   const workflowAction = input.action === "release" ? "deploy" : input.action;
   const workflowInputs: Record<string, string> = { action: workflowAction };
-  if (project.id === "media") Object.assign(workflowInputs, {
+  if (project.resourceManaged) Object.assign(workflowInputs, {
     resource_profile: profileName,
     app_cpu: profiles[profileName].cpu,
     app_memory: profiles[profileName].memory,

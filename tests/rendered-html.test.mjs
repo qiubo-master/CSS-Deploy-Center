@@ -30,6 +30,8 @@ test("server-renders the CI/CD control center", async () => {
   assert.match(html, /云服务器与 AutoDL 资源监控/);
   assert.match(html, /接入服务器/);
   assert.match(html, /项目资源占用/);
+  assert.match(html, /资源接入与一键部署/);
+  assert.match(html, /一键建立流水线并发布/);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape|react-loading-skeleton/);
 });
 
@@ -48,6 +50,7 @@ test("control-center API returns a usable demo dashboard", async () => {
   assert.equal(body.resourceProfiles.length, 3);
   assert.ok(Array.isArray(body.pipelines));
   assert.ok(body.version);
+  assert.ok(Array.isArray(body.latestSteps));
   assert.ok(body.pipeline.stages.length >= 6);
   assert.ok(body.releases.length >= 1);
 });
@@ -77,6 +80,9 @@ test("metadata and deployment assets are present", async () => {
   assert.match(workflow, /Deploy Control Center/);
   assert.match(dockerfile, /node:22-alpine/);
   assert.match(envExample, /GITHUB_TOKEN/);
+  const manual = await readFile(new URL("../docs/操作手册.md", import.meta.url), "utf8");
+  assert.match(manual, /接入云服务器/);
+  assert.match(manual, /一键资源下发与首次发布/);
   await assert.rejects(access(new URL("../app/_sites-preview/SkeletonPreview.tsx", import.meta.url)));
   assert.ok(root);
 });
