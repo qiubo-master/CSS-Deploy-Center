@@ -54,7 +54,9 @@ Media 仓库需配置与控制台相同的部署 Secrets：`DEPLOY_HOST`、`DEPL
 
 控制台以“项目”为一级视图：一个项目可以绑定多个部署目标，一台服务器也可以承载多个项目。部署目标通过 `SERVER_INVENTORY_JSON` 配置，支持普通云服务器、裸金属和 AutoDL；每个目标包含稳定 ID、名称、厂商、区域、地址、监控地址和允许部署的项目。
 
-每台 Linux 服务器运行只读代理 `ops/resource-agent.py`，采集 CPU、内存、磁盘；检测到 NVIDIA 驱动时额外采集 GPU 使用率和显存。代理只监听 `127.0.0.1:9108`，应通过 VPN、内网或 HTTPS Nginx 反向代理供控制中心访问，不要将无 TLS 的代理端口直接暴露到公网。
+每台 Linux 服务器运行只读代理 `ops/resource-agent.py`，采集 CPU、内存、磁盘；检测到 NVIDIA 驱动时额外采集 GPU 使用率和显存。同机部署时代理只监听 Docker 内部网关；跨服务器时应通过 VPN、云内网或 HTTPS Nginx 反向代理供控制中心访问，不要将无 TLS 的代理端口直接暴露到公网。
+
+当前与控制中心同机的阿里云服务器由 `ops/install-resource-agent.sh` 自动生成独立令牌并注册 systemd 服务。代理同时读取 Docker 的实时统计和 Compose 项目标记，因此控制台可以展示每个项目的容器数量、CPU、内存使用量与内存上限。页面右上角的“＋ 接入服务器”用于登记后续云服务器或 AutoDL；资产数据持久化在 `/opt/css-deploy-center/shared/data/servers.json`，发布控制中心版本时不会丢失。
 
 ```bash
 sudo install -m 750 ops/resource-agent.py /usr/local/bin/forgeops-resource-agent

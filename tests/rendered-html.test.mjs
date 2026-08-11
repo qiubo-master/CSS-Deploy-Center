@@ -28,6 +28,8 @@ test("server-renders the CI/CD control center", async () => {
   assert.match(html, /序章自媒体中台/);
   assert.match(html, /项目管理/);
   assert.match(html, /云服务器与 AutoDL 资源监控/);
+  assert.match(html, /接入服务器/);
+  assert.match(html, /项目资源占用/);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape|react-loading-skeleton/);
 });
 

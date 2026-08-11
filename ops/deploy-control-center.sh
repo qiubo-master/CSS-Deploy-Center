@@ -4,6 +4,8 @@ set -euo pipefail
 ROOT="${DEPLOY_ROOT:-/opt/css-deploy-center}"
 RELEASE="$ROOT/releases/$RELEASE_SHA"
 mkdir -p "$RELEASE" "$ROOT/releases" "$ROOT/shared"
+mkdir -p "$ROOT/shared/data"
+chmod 700 "$ROOT/shared/data"
 touch "$ROOT/shared/.env"
 tar -xzf "$ARCHIVE" -C "$RELEASE"
 cd "$RELEASE"

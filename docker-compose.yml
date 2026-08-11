@@ -5,5 +5,9 @@ services:
     build: .
     restart: unless-stopped
     env_file: .env
+    volumes:
+      - /opt/css-deploy-center/shared/data:/app/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "127.0.0.1:3000:3000"

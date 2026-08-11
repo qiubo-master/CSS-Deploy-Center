@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { deploymentProjects, getProject } from "../../../lib/deployment-projects";
-import { assessCapacity, monitorTarget, serverTargets } from "../../../lib/infrastructure";
+import { assessCapacity, monitorTarget, projectUsage, publicTarget, serverTargets } from "../../../lib/infrastructure";
 
 export const dynamic = "force-dynamic";
 
@@ -68,12 +68,12 @@ function demoRuns(projectId: string) {
 
 export async function GET(request: NextRequest) {
   const selected = getProject(request.nextUrl.searchParams.get("project"));
-  const targets = serverTargets();
+  const targets = await serverTargets();
   const [owner, repo] = selected.repository.split("/");
   const health = await checkHealth(selected.healthUrl);
   const monitoredServers = await Promise.all(targets.map(async (target) => {
     const monitor = await monitorTarget(target);
-    return { ...target, ...monitor, capacity: assessCapacity(monitor.snapshot, { cpu: 2, memoryMb: 3072, diskGb: 10 }) };
+    return { ...publicTarget(target), ...monitor, projectUsage: projectUsage(monitor.snapshot), capacity: assessCapacity(monitor.snapshot, { cpu: 2, memoryMb: 3072, diskGb: 10 }) };
   }));
   let runs: GitHubRun[] = [];
   let latestCommit: { sha: string; message: string; author: string; date: string; url: string } | null = null;
@@ -175,7 +175,8 @@ export async function POST(request: NextRequest) {
   if (!["deploy", "release", "rollback"].includes(input.action)) return NextResponse.json({ message: "不支持的操作" }, { status: 400 });
 
   const project = getProject(input.projectId);
-  const target = serverTargets().find((item) => item.id === input.targetId) ?? serverTargets().find((item) => project.targetIds.includes(item.id));
+  const targets = await serverTargets();
+  const target = targets.find((item) => item.id === input.targetId) ?? targets.find((item) => project.targetIds.includes(item.id));
   if (!target || !project.targetIds.includes(target.id)) return NextResponse.json({ message: "该项目未绑定此部署目标" }, { status: 400 });
   const profiles = {
     small: { cpu: "1.0", memory: "1g", database_memory: "512m" },

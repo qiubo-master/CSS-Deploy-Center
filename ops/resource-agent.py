@@ -10,6 +10,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 TOKEN = os.environ.get("FORGEOPS_MONITOR_TOKEN", "")
 PORT = int(os.environ.get("FORGEOPS_MONITOR_PORT", "9108"))
+BIND = os.environ.get("FORGEOPS_MONITOR_BIND", "127.0.0.1")
 
 
 def cpu_sample():
@@ -31,6 +32,7 @@ def snapshot():
             memory[key] = int(value.strip().split()[0])
     disk = shutil.disk_usage("/")
     gpus = []
+    containers = []
     try:
         output = subprocess.check_output([
             "nvidia-smi", "--query-gpu=name,memory.total,memory.used,utilization.gpu",
@@ -40,6 +42,26 @@ def snapshot():
             name, total, used, utilization = [item.strip() for item in line.split(",")]
             gpus.append({"name": name, "memoryTotalMb": int(total), "memoryUsedMb": int(used), "utilizationPercent": int(utilization)})
     except (FileNotFoundError, subprocess.SubprocessError, ValueError):
+        pass
+    try:
+        names = subprocess.check_output(["docker", "ps", "--format", "{{.Names}}"], text=True, timeout=3).splitlines()
+        projects = {}
+        if names:
+            inspected = json.loads(subprocess.check_output(["docker", "inspect", *names], text=True, timeout=4))
+            for item in inspected:
+                labels = item.get("Config", {}).get("Labels", {}) or {}
+                projects[item.get("Name", "").lstrip("/")] = labels.get("com.docker.compose.project", "other")
+            output = subprocess.check_output(["docker", "stats", "--no-stream", "--format", "{{json .}}", *names], text=True, timeout=8)
+            for line in output.splitlines():
+                item = json.loads(line)
+                used, limit = item.get("MemUsage", "0B / 0B").split(" / ")
+                def memory_mb(value):
+                    number = float("".join(char for char in value if char.isdigit() or char == ".") or 0)
+                    unit = "".join(char for char in value if char.isalpha()).lower()
+                    return number * ({"b": 1 / 1024 / 1024, "kb": 1 / 1024, "kib": 1 / 1024, "mb": 1, "mib": 1, "gb": 1024, "gib": 1024}.get(unit, 1))
+                name = item.get("Name", "unknown")
+                containers.append({"name": name, "composeProject": projects.get(name, "other"), "cpuUsedPercent": float(item.get("CPUPerc", "0").rstrip("%")), "memoryUsedMb": round(memory_mb(used), 1), "memoryLimitMb": round(memory_mb(limit), 1)})
+    except (FileNotFoundError, subprocess.SubprocessError, ValueError, json.JSONDecodeError):
         pass
     total_mb = round(memory["MemTotal"] / 1024)
     available_mb = round(memory.get("MemAvailable", memory.get("MemFree", 0)) / 1024)
@@ -51,6 +73,7 @@ def snapshot():
         "diskTotalGb": round(disk.total / 1024 ** 3, 1),
         "diskUsedGb": round(disk.used / 1024 ** 3, 1),
         "gpu": gpus,
+        "containers": containers,
         "collectedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
     }
 
@@ -75,4 +98,4 @@ class Handler(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
-    ThreadingHTTPServer(("127.0.0.1", PORT), Handler).serve_forever()
+    ThreadingHTTPServer((BIND, PORT), Handler).serve_forever()
