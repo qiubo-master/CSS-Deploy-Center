@@ -30,9 +30,20 @@ test("server-renders the CI/CD control center", async () => {
   assert.match(html, /云服务器与 AutoDL 资源监控/);
   assert.match(html, /接入服务器/);
   assert.match(html, /项目资源占用/);
+  assert.match(html, /href="\/resources"/);
+  assert.doesNotMatch(html, /资源接入与一键部署/);
+  assert.doesNotMatch(html, /codex-preview|Your site is taking shape|react-loading-skeleton/);
+});
+
+test("server-renders resource onboarding as a dedicated page", async () => {
+  const app = await worker();
+  const response = await app.fetch(new Request("http://localhost/resources", { headers: { accept: "text/html" } }), env, ctx);
+  assert.equal(response.status, 200);
+  const html = await response.text();
   assert.match(html, /资源接入与一键部署/);
   assert.match(html, /一键建立流水线并发布/);
-  assert.doesNotMatch(html, /codex-preview|Your site is taking shape|react-loading-skeleton/);
+  assert.match(html, /接入计算资源/);
+  assert.match(html, /返回项目看板/);
 });
 
 test("control-center API returns a usable demo dashboard", async () => {
