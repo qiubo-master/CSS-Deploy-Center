@@ -4,6 +4,8 @@
 
 面向 `qiubo-master/CSS` 与 `qiubo-master/Media` 的可视化发布工作台。它通过 GitHub Actions API 触发部署和回滚，并为 Media 下发 CPU、内存、数据库内存、公网端口和暴露模式。
 
+GFM 通用大模型基座作为独立 GPU 服务接入，使用专用 `deploy.yml` 发布到 AutoDL，并复用服务器上的模型、Redis 和受保护运行配置。
+
 ## 当前线上入口
 
 - CI/CD 控制台：`http://47.120.76.166/`
