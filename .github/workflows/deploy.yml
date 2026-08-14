@@ -28,7 +28,7 @@ jobs:
       - name: Configure SSH
         env:
           SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
-          SSH_HOST_KEY: ${{ secrets.DEPLOY_HOST_KEY }}
+          SSH_HOST_KEY: ${{ secrets.DEPLOY_HOST_KEY_CURRENT }}
         run: |
           install -m 700 -d ~/.ssh
           printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
