@@ -1,4 +1,5 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
 import { dirname, join } from "node:path";
 
 export type ServerKind = "cloud" | "autodl" | "bare-metal";
@@ -10,6 +11,12 @@ export type ServerTarget = {
   kind: ServerKind;
   region: string;
   address: string;
+  sshPort?: number;
+  sshUser?: string;
+  authType?: "key" | "password";
+  hostKey?: string;
+  deploymentBasePath?: string;
+  credentialConfigured?: boolean;
   monitorUrl?: string;
   monitorToken?: string;
   projectIds: string[];
@@ -38,13 +45,14 @@ export type ResourceSnapshot = {
 export type CapacityRequest = { cpu: number; memoryMb: number; diskGb: number };
 
 const inventoryFile = join(process.env.CONTROL_CENTER_DATA_DIR ?? "/app/data", "servers.json");
+const credentialsFile = join(process.env.CONTROL_CENTER_DATA_DIR ?? "/app/data", "server-credentials.json");
 const defaultTargets: ServerTarget[] = [{
   id: "aliyun-main",
   name: "阿里云生产服务器",
   provider: "阿里云",
   kind: "cloud",
   region: process.env.ALIYUN_REGION ?? "cn-hangzhou",
-  address: process.env.DEPLOY_HOST ?? "47.120.76.166",
+  address: process.env.DEPLOY_HOST ?? "47.113.191.114",
   monitorUrl: process.env.ALIYUN_MONITOR_URL ?? "http://host.docker.internal:9108/v1/resources",
   monitorToken: process.env.MONITOR_AGENT_TOKEN,
   projectIds: ["css", "media"],
@@ -71,6 +79,40 @@ export async function serverTargets(): Promise<ServerTarget[]> {
 export async function saveServerTargets(targets: ServerTarget[]) {
   await mkdir(dirname(inventoryFile), { recursive: true });
   await writeFile(inventoryFile, `${JSON.stringify(targets, null, 2)}\n`, { mode: 0o600 });
+}
+
+type ServerCredential = { password?: string; privateKey?: string };
+type EncryptedCredential = { iv: string; tag: string; data: string };
+
+function encryptionKey() {
+  const configured = process.env.SERVER_CREDENTIAL_KEY;
+  if (!configured) throw new Error("控制中心未配置 SERVER_CREDENTIAL_KEY，暂不能保存服务器密码或私钥");
+  return createHash("sha256").update(configured).digest();
+}
+
+async function credentialStore() {
+  try { return JSON.parse(await readFile(credentialsFile, "utf8")) as Record<string, EncryptedCredential>; }
+  catch { return {} as Record<string, EncryptedCredential>; }
+}
+
+export async function saveServerCredential(id: string, credential: ServerCredential) {
+  if (!credential.password && !credential.privateKey) return false;
+  const iv = randomBytes(12);
+  const cipher = createCipheriv("aes-256-gcm", encryptionKey(), iv);
+  const encrypted = Buffer.concat([cipher.update(JSON.stringify(credential), "utf8"), cipher.final()]);
+  const store = await credentialStore();
+  store[id] = { iv: iv.toString("base64"), tag: cipher.getAuthTag().toString("base64"), data: encrypted.toString("base64") };
+  await mkdir(dirname(credentialsFile), { recursive: true });
+  await writeFile(credentialsFile, `${JSON.stringify(store, null, 2)}\n`, { mode: 0o600 });
+  return true;
+}
+
+export async function readServerCredential(id: string) {
+  const item = (await credentialStore())[id];
+  if (!item) return null;
+  const decipher = createDecipheriv("aes-256-gcm", encryptionKey(), Buffer.from(item.iv, "base64"));
+  decipher.setAuthTag(Buffer.from(item.tag, "base64"));
+  return JSON.parse(Buffer.concat([decipher.update(Buffer.from(item.data, "base64")), decipher.final()]).toString("utf8")) as ServerCredential;
 }
 
 export function publicTarget(target: ServerTarget) {

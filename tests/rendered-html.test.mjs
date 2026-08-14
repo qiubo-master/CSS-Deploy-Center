@@ -40,10 +40,23 @@ test("server-renders resource onboarding as a dedicated page", async () => {
   const response = await app.fetch(new Request("http://localhost/resources", { headers: { accept: "text/html" } }), env, ctx);
   assert.equal(response.status, 200);
   const html = await response.text();
-  assert.match(html, /资源接入与一键部署/);
+  assert.match(html, /服务器接入、编辑与项目部署/);
+  assert.match(html, /保存并接入服务器/);
+  assert.match(html, /后台接入操作与取值来源/);
+  assert.match(html, /GitHub 仓库地址/);
   assert.match(html, /一键建立流水线并发布/);
-  assert.match(html, /接入计算资源/);
+  assert.match(html, /公网 IP \/ 主机名/);
   assert.match(html, /返回项目看板/);
+});
+
+test("server-renders the IP and credential change manual", async () => {
+  const app = await worker();
+  const response = await app.fetch(new Request("http://localhost/docs/server-change-guide", { headers: { accept: "text/html" } }), env, ctx);
+  assert.equal(response.status, 200);
+  const html = await response.text();
+  assert.match(html, /服务器 IP 与认证变更手册/);
+  assert.match(html, /DEPLOY_HOST_KEY/);
+  assert.match(html, /GitHub 仓库属于项目/);
 });
 
 test("control-center API returns a usable demo dashboard", async () => {
