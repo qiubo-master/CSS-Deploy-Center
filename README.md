@@ -8,8 +8,8 @@ GFM 通用大模型基座作为独立 GPU 服务接入，使用专用 `deploy.ym
 
 ## 当前线上入口
 
-- CI/CD 控制台：`http://47.120.76.166/`
-- Media 自媒体中台：`http://47.120.76.166:8080/`
+- CI/CD 控制台：`http://47.113.191.114/`
+- Media 自媒体中台：`http://47.113.191.114:8080/`
 
 当前两个系统共享同一个阿里云公网 IP，通过不同端口提供服务。Media 已完成首次资源下发，日常更新不需要再次调整 CPU、内存、端口或数据库卷。
 
@@ -21,7 +21,7 @@ GFM 通用大模型基座作为独立 GPU 服务接入，使用专用 `deploy.ym
 4. 在“管理员令牌”输入框粘贴服务器中配置的 `CONTROL_CENTER_ADMIN_TOKEN`。
 5. 点击 **发布最新版本**。页面中的 **＋ 新建发布流水线** 是同一个发布动作的快捷入口。
 6. 在“流水线列表”查看构建、迁移、部署和健康检查结果；需要完整日志时点击 GitHub 详情。
-7. 流水线成功后访问 `http://47.120.76.166:8080/` 验证新版本。
+7. 流水线成功后访问 `http://47.113.191.114:8080/` 验证新版本。
 
 “发布最新版本”会复用现有的资源配置、数据库持久卷和 `/opt/media-platform/shared/.env`，不会重新创建服务器，也不会清空业务数据。如果 GitHub 最新版本与线上版本相同，通常无需重复发布。
 
@@ -74,7 +74,7 @@ sudo env FORGEOPS_MONITOR_TOKEN='生成的独立随机令牌' \
 ```dotenv
 MONITOR_AGENT_TOKEN=所有代理共用或经网关转换的只读令牌
 ALIYUN_MONITOR_URL=https://monitor.example.com/v1/resources
-SERVER_INVENTORY_JSON=[{"id":"aliyun-main","name":"阿里云生产服务器","provider":"阿里云","kind":"cloud","region":"cn-hangzhou","address":"47.120.76.166","monitorUrl":"https://monitor.example.com/v1/resources","projectIds":["css","media"]},{"id":"autodl-gpu-1","name":"AutoDL GPU 01","provider":"AutoDL","kind":"autodl","region":"西北","address":"实例地址","monitorUrl":"https://autodl-agent.example.com/v1/resources","projectIds":["media"]}]
+SERVER_INVENTORY_JSON=[{"id":"aliyun-main","name":"阿里云生产服务器","provider":"阿里云","kind":"cloud","region":"cn-hangzhou","address":"47.113.191.114","monitorUrl":"https://monitor.example.com/v1/resources","projectIds":["css","media"]},{"id":"autodl-gpu-1","name":"AutoDL GPU 01","provider":"AutoDL","kind":"autodl","region":"西北","address":"实例地址","monitorUrl":"https://autodl-agent.example.com/v1/resources","projectIds":["media"]}]
 ```
 
 下发前容量判断采用保守策略：请求资源之外至少保留 20% CPU、20% 内存和 5GB 磁盘空间。监控未接入、目标离线或余量不足时，控制台禁用资源下发；日常向已部署目标发布新版本不受首次资源下发按钮影响。
