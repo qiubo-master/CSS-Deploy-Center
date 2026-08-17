@@ -2,7 +2,12 @@ name: css-deploy-center
 
 services:
   control-center:
-    build: .
+    # 1.github拉代码本地编译
+    # build: .
+    # 2.拉取阿里远程镜像库
+    # image: crpi-73ce4hnji7xum4zi.cn-heyuan.personal.cr.aliyuncs.com/qiubo-master/css-deploy-center:1.0.0
+    # 3.拷取镜像文件本地加载
+    image: css-deploy-center:1.0.0
     restart: unless-stopped
     env_file: .env
     volumes:
@@ -10,4 +15,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
-      - "127.0.0.1:3000:3000"
+      # 127.0.0.1只能本机访问
+      # - "127.0.0.1:3000:3000"
+      # 0.0.0.0为全域开放包括公网，8088为宿主机端口，3000为docker内置端口
+      - "0.0.0.0:8088:3000"
