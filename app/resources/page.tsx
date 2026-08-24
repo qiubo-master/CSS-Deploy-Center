@@ -72,7 +72,7 @@ export default function ResourcesPage() {
   };
 
   return <main className="shell">
-    <aside className="sidebar"><div className="brand"><span className="brandMark">F</span><div><b>ForgeOps</b><small>Release Center</small></div></div><nav aria-label="主导航"><Link href="/#projects"><span>◇</span>项目管理</Link><Link className="active" href="/resources"><span>＋</span>资源接入</Link><Link href="/#servers"><span>▦</span>服务器</Link><Link href="/#release"><span>↑</span>版本发布</Link><Link href="/#pipelines"><span>≋</span>流水线</Link></nav><div className="sideFoot"><span className="avatar">QB</span><div><b>qiubo-master</b><small>生产管理员</small></div></div></aside>
+    <aside className="sidebar"><div className="brand"><span className="brandMark">F</span><div><b>ForgeOps</b><small>Release Center</small></div></div><nav aria-label="主导航"><Link href="/#projects"><span>◇</span>项目管理</Link><Link href="/#release"><span>↑</span>版本发布</Link><Link href="/#pipelines"><span>≋</span>流水线</Link><Link className="active" href="/resources"><span>＋</span>资源接入</Link><Link href="/servers"><span>▦</span>服务器</Link></nav><div className="sideFoot"><span className="avatar">QB</span><div><b>qiubo-master</b><small>生产管理员</small></div></div></aside>
     <section className="workspace">
       <header className="topbar"><div><span className="crumb">资源管理 / 服务器与项目接入</span><h1>资源接入</h1></div><div className="topActions"><span className={`mode ${mode}`}>{mode === "live" ? "LIVE" : "DEMO"}</span><Link className="secondary pageBack" href="/">返回项目看板</Link></div></header>
       <div className="content resourceContent">
