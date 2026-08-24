@@ -62,7 +62,7 @@ jobs:
           REMOTE
 `;
 
-const headers = () => ({ Authorization: `Bearer ${process.env.GITHUB_TOKEN}`, Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28", "Content-Type": "application/json" });
+const headers = () => ({ Authorization: `Bearer ${process.env.GITHUB_TOKEN}`, Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28", "Content-Type": "application/json", "User-Agent": "ForgeOps-ControlCenter" });
 
 function authorized(request: NextRequest) {
   const expected = process.env.CONTROL_CENTER_ADMIN_TOKEN;
