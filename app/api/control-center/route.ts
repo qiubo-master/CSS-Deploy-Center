@@ -65,9 +65,12 @@ export async function GET(request: NextRequest) {
   const projects = await deploymentProjects();
   const selected = await getProject(request.nextUrl.searchParams.get("project"));
   const targets = await serverTargets();
-  const selectedWithTargets = { ...selected, targetIds: targets.filter((target) => target.projectIds.includes(selected.id)).map((target) => target.id) };
-  const [owner, repo] = selected.repository.split("/");
-  const health = await checkHealth(selected.healthUrl);
+  const resolveHost = (address: string | undefined, url: string | undefined) => (address && url && /^https?:\/\//.test(url) ? url.replace(/\/\/[^:/]+/, `//${address}`) : url);
+  const selectedServer = targets.find((target) => selected.targetIds.includes(target.id));
+  const selectedResolved = { ...selected, endpoint: resolveHost(selectedServer?.address, selected.endpoint), healthUrl: resolveHost(selectedServer?.address, selected.healthUrl) };
+  const selectedWithTargets = { ...selectedResolved, targetIds: targets.filter((target) => target.projectIds.includes(selected.id)).map((target) => target.id) };
+  const [owner, repo] = selectedResolved.repository.split("/");
+  const health = await checkHealth(selectedResolved.healthUrl);
   const monitoredServers = await Promise.all(targets.map(async (target) => {
     const monitor = await monitorTarget(target);
     return { ...publicTarget(target), ...monitor, projectUsage: projectUsage(monitor.snapshot), capacity: assessCapacity(monitor.snapshot, { cpu: 2, memoryMb: 3072, diskGb: 10 }) };
@@ -132,13 +135,13 @@ export async function GET(request: NextRequest) {
       repository: project.repository,
       branch: project.branch,
       description: project.description,
-      endpoint: project.endpoint,
+      endpoint: resolveHost(targets.find((target) => project.targetIds.includes(target.id))?.address, project.endpoint),
       resourceManaged: project.resourceManaged,
       targetIds: targets.filter((target) => target.projectIds.includes(project.id)).map((target) => target.id),
     })),
     project: selectedWithTargets,
     servers: monitoredServers,
-    service: { ...health, version: latestSuccessfulDeploy?.head_sha.slice(0, 7) ?? (selected.id === "media" ? "待发布" : "current"), endpoint: selected.endpoint },
+    service: { ...health, version: latestSuccessfulDeploy?.head_sha.slice(0, 7) ?? (selectedResolved.id === "media" ? "待发布" : "current"), endpoint: selectedResolved.endpoint },
     version: {
       latest: latestCommit,
       deployed: latestSuccessfulDeploy?.head_sha.slice(0, 7) ?? null,
