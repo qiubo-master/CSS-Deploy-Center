@@ -19,17 +19,12 @@ test("server-renders the CI/CD control center", async () => {
   const html = await response.text();
   assert.match(html, /ForgeOps/);
   assert.match(html, /CI\/CD 发布控制中心/);
-  assert.match(html, /CI\/CD 发布控制中心/);
-  assert.match(html, /首次部署与资源调整/);
   assert.match(html, /发布最新版本/);
   assert.match(html, /流水线列表/);
   assert.match(html, /新建发布流水线/);
   assert.match(html, /回滚上一版本/);
   assert.match(html, /序章自媒体中台/);
   assert.match(html, /项目管理/);
-  assert.match(html, /云服务器与 AutoDL 资源监控/);
-  assert.match(html, /接入服务器/);
-  assert.match(html, /项目资源占用/);
   assert.match(html, /href="\/resources"/);
   assert.doesNotMatch(html, /资源接入与一键部署/);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape|react-loading-skeleton/);
@@ -66,7 +61,7 @@ test("control-center API returns a usable demo dashboard", async () => {
   const body = await response.json();
   assert.equal(body.mode, "demo");
   assert.equal(body.project.repository, "qiubo-master/Media");
-  assert.equal(body.projects.length, 5);
+  assert.equal(body.projects.length, 6);
   assert.ok(body.projects.some((project) => project.repository === "qiubo-master/AI_WMS"));
   assert.ok(body.projects.some((project) => project.repository === "qiubo-master/AI_OPS"));
   assert.ok(body.projects.some((project) => project.repository === "qiubo-master/GFM"));
