@@ -12,7 +12,7 @@ on:
   workflow_run:
     workflows: ["Control Center CI"]
     types: [completed]
-    branches: [main]
+    branches: [master]
 
 concurrency:
   group: control-center-production
