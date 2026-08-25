@@ -11,7 +11,7 @@ tar -xzf "$ARCHIVE" -C "$RELEASE"
 cd "$RELEASE"
 ln -sfn "$ROOT/shared/.env" .env
 docker compose build control-center
-docker compose up -d control-center
+docker compose up -d --force-recreate control-center
 for _ in $(seq 1 30); do
   curl -fsS http://127.0.0.1:3000/ >/dev/null && break
   sleep 2
