@@ -1,6 +1,6 @@
 # ForgeOps · 多项目 CI/CD 发布控制中心
 
-完整的服务器接入、仓库配置、资源下发、流水线发布和故障处理步骤请查看 [ForgeOps CI/CD 中台操作手册](docs/操作手册.md)。
+完整的服务器接入、仓库配置、资源下发、流水线发布和故障处理步骤请查看 [ForgeOps CI/CD 中台操作手册](docs/操作手册.md)。新服务器的私网发布配置请查看 [Tailscale 私网发布配置手册](docs/Tailscale私网发布配置手册.md)。
 
 面向 `qiubo-master/CSS` 与 `qiubo-master/Media` 的可视化发布工作台。它通过 GitHub Actions API 触发部署和回滚，并为 Media 下发 CPU、内存、数据库内存、公网端口和暴露模式。
 
@@ -8,20 +8,20 @@ GFM 通用大模型基座作为独立 GPU 服务接入，使用专用 `deploy.ym
 
 ## 当前线上入口
 
-- CI/CD 控制台：`http://47.113.191.114/`
-- Media 自媒体中台：`http://47.113.191.114:8080/`
+- CI/CD 控制台（Tailscale 私网）：`http://100.103.132.88/`
+- Media 自媒体中台（Tailscale 私网）：`http://100.103.132.88:8080/`
 
-当前两个系统共享同一个阿里云公网 IP，通过不同端口提供服务。Media 已完成首次资源下发，日常更新不需要再次调整 CPU、内存、端口或数据库卷。
+当前两个系统部署在同一台新服务器上，通过不同端口提供服务。`100.103.132.88` 是 Tailscale 私网地址，访问端也必须加入相同 tailnet 并获得访问权限。
 
 ## 日常发布 Media
 
-1. 将 Media 新版本推送到 `qiubo-master/Media` 的 `main` 分支。
+1. 将 Media 新版本推送到 `qiubo-master/Media` 的 `master` 分支。
 2. 打开 CI/CD 控制台并选择 **Media 自媒体中台**。
 3. 刷新页面，确认“GitHub 最新版本”与“线上运行版本”不同，页面出现“有新版本”。
 4. 在“管理员令牌”输入框粘贴服务器中配置的 `CONTROL_CENTER_ADMIN_TOKEN`。
 5. 点击 **发布最新版本**。页面中的 **＋ 新建发布流水线** 是同一个发布动作的快捷入口。
 6. 在“流水线列表”查看构建、迁移、部署和健康检查结果；需要完整日志时点击 GitHub 详情。
-7. 流水线成功后访问 `http://47.113.191.114:8080/` 验证新版本。
+7. 流水线成功后从 tailnet 内访问 `http://100.103.132.88:8080/` 验证新版本。
 
 “发布最新版本”会复用现有的资源配置、数据库持久卷和 `/opt/media-platform/shared/.env`，不会重新创建服务器，也不会清空业务数据。如果 GitHub 最新版本与线上版本相同，通常无需重复发布。
 
@@ -50,7 +50,7 @@ grep '^CONTROL_CENTER_ADMIN_TOKEN=.' /opt/css-deploy-center/shared/.env \
 
 控制台提供轻量、标准、增强三档配置。默认将 Media 发布到阿里云服务器的共享公网 IP `8080` 端口；选择“统一 Nginx 网关”后仅监听 `127.0.0.1`，用于域名反向代理。资源值由固定档位产生，服务端会再次校验，不接受任意 Compose 内容或 Shell 命令。
 
-Media 仓库需配置与控制台相同的部署 Secrets：`DEPLOY_HOST`、`DEPLOY_PORT`、`DEPLOY_USER`、`DEPLOY_SSH_KEY`、`DEPLOY_HOST_KEY`。服务器 `/opt/media-platform/shared/.env` 保存数据库与模型密钥，首次部署前从 Media 仓库 `.env.example` 创建并修改。
+Media 仓库需配置部署 Secrets：`DEPLOY_HOST`、`DEPLOY_PORT`、`DEPLOY_USER`、`DEPLOY_SSH_KEY`、`DEPLOY_HOST_KEY`、`TS_OAUTH_CLIENT_ID`、`TS_OAUTH_SECRET`。服务器 `/opt/media-platform/shared/.env` 保存数据库与模型密钥，首次部署前从 Media 仓库 `.env.example` 创建并修改。
 
 当前 Media 已完成首次资源下发，除非要扩缩容或更换端口，否则不要重复使用此功能。
 
@@ -74,7 +74,7 @@ sudo env FORGEOPS_MONITOR_TOKEN='生成的独立随机令牌' \
 ```dotenv
 MONITOR_AGENT_TOKEN=所有代理共用或经网关转换的只读令牌
 ALIYUN_MONITOR_URL=https://monitor.example.com/v1/resources
-SERVER_INVENTORY_JSON=[{"id":"aliyun-main","name":"阿里云生产服务器","provider":"阿里云","kind":"cloud","region":"cn-hangzhou","address":"47.113.191.114","monitorUrl":"https://monitor.example.com/v1/resources","projectIds":["css","media"]},{"id":"autodl-gpu-1","name":"AutoDL GPU 01","provider":"AutoDL","kind":"autodl","region":"西北","address":"实例地址","monitorUrl":"https://autodl-agent.example.com/v1/resources","projectIds":["media"]}]
+SERVER_INVENTORY_JSON=[{"id":"production-main","name":"生产服务器","provider":"私有部署","kind":"cloud","region":"tailnet","address":"100.103.132.88","monitorUrl":"http://100.103.132.88:9108/v1/resources","projectIds":["css","media"]},{"id":"autodl-gpu-1","name":"AutoDL GPU 01","provider":"AutoDL","kind":"autodl","region":"西北","address":"实例地址","monitorUrl":"https://autodl-agent.example.com/v1/resources","projectIds":["media"]}]
 ```
 
 下发前容量判断采用保守策略：请求资源之外至少保留 20% CPU、20% 内存和 5GB 磁盘空间。监控未接入、目标离线或余量不足时，控制台禁用资源下发；日常向已部署目标发布新版本不受首次资源下发按钮影响。
@@ -96,7 +96,7 @@ pnpm dev
 
 ## 阿里云部署
 
-服务器信息确认后，配置仓库 Secrets：`DEPLOY_HOST`、`DEPLOY_PORT`、`DEPLOY_USER`、`DEPLOY_SSH_KEY`、`DEPLOY_HOST_KEY`。流水线会构建 Docker 镜像、健康检查并保留最近五个版本。
+服务器信息确认后，按 [Tailscale 私网发布配置手册](docs/Tailscale私网发布配置手册.md) 配置 Tailscale、SSH 和仓库 Secrets。流水线会在 GitHub Runner 构建 Docker 镜像，通过 Tailscale 上传到服务器，健康检查并保留最近五个版本。
 
 ## 常见问题
 

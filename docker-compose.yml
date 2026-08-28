@@ -3,7 +3,8 @@ name: css-deploy-center
 services:
   control-center:
     build: .
-    image: css-deploy-center:1.0.0
+    image: ${CONTROL_CENTER_IMAGE:-css-deploy-center:1.0.0}
+    pull_policy: never
     restart: unless-stopped
     env_file: .env
     volumes:
