@@ -135,6 +135,7 @@ export async function GET(request: NextRequest) {
       repository: project.repository,
       branch: project.branch,
       description: project.description,
+      manualUrl: project.manualUrl ?? `https://github.com/${project.repository}/blob/${project.branch}/README.md`,
       endpoint: resolveHost(targets.find((target) => project.targetIds.includes(target.id))?.address, project.endpoint),
       resourceManaged: project.resourceManaged,
       targetIds: targets.filter((target) => target.projectIds.includes(project.id)).map((target) => target.id),

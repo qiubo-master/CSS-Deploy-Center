@@ -23,8 +23,11 @@ test("server-renders the CI/CD control center", async () => {
   assert.match(html, /流水线列表/);
   assert.match(html, /新建发布流水线/);
   assert.match(html, /回滚上一版本/);
+  assert.match(html, /访问项目/);
+  assert.match(html, /操作手册/);
   assert.match(html, /序章自媒体中台/);
   assert.match(html, /项目管理/);
+  assert.match(html, /Otel 可观测平台/);
   assert.match(html, /href="\/resources"/);
   assert.doesNotMatch(html, /资源接入与一键部署/);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape|react-loading-skeleton/);
@@ -61,10 +64,13 @@ test("control-center API returns a usable demo dashboard", async () => {
   const body = await response.json();
   assert.equal(body.mode, "demo");
   assert.equal(body.project.repository, "qiubo-master/Media");
-  assert.equal(body.projects.length, 6);
+  assert.equal(body.projects.length, 7);
   assert.ok(body.projects.some((project) => project.repository === "qiubo-master/AI_WMS"));
   assert.ok(body.projects.some((project) => project.repository === "qiubo-master/AI_OPS"));
   assert.ok(body.projects.some((project) => project.repository === "qiubo-master/GFM"));
+  const otel = body.projects.find((project) => project.repository === "qiubo-master/Otel");
+  assert.equal(otel.branch, "main");
+  assert.match(otel.manualUrl, /docs\/OPERATIONS\.md$/);
   assert.ok(Array.isArray(body.servers));
   assert.equal(body.servers[0].capacity.eligible, false);
   assert.equal(body.resourceProfiles.length, 3);

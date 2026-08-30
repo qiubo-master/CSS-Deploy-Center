@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 
 type ProjectId = string;
-type Project = { id: ProjectId; name: string; repository: string; branch: string; description: string; endpoint: string; resourceManaged: boolean; targetIds: string[] };
+type Project = { id: ProjectId; name: string; repository: string; branch: string; description: string; manualUrl?: string; endpoint: string; resourceManaged: boolean; targetIds: string[] };
 type Profile = { id: string; name: string; cpu: string; memory: string; databaseMemory: string; note: string };
 type Pipeline = { id: string; number: number; name: string; status: string; conclusion: string | null; commit: string; branch: string; event: string; actor: string; createdAt: string; duration: string; url: string };
 type ProjectUsage = { projectId: string; containerCount: number; cpuUsedPercent: number; memoryUsedMb: number; memoryLimitMb: number; containers: string[] };
@@ -29,6 +29,9 @@ const seed: Dashboard = {
     { id: "media", name: "序章自媒体中台", repository: "qiubo-master/Media", branch: "main", description: "内容生产、账号矩阵与 AI 决策中台", endpoint: "http://47.113.191.114:8080", resourceManaged: true, targetIds: ["aliyun-main"] },
     { id: "ai-wms", name: "AI供应链智能备货", repository: "qiubo-master/AI_WMS", branch: "main", description: "轮胎需求预测、库存监控与AI解释演示系统", endpoint: "http://47.120.61.139", resourceManaged: false, targetIds: ["aliyun2"] },
     { id: "ai-ops", name: "AI运营", repository: "qiubo-master/AI_OPS", branch: "main", description: "AI数字化培训、AI图像检测、AI维修诊断与AI保养报价", endpoint: "等待首次发布", resourceManaged: false, targetIds: ["aliyun2"] },
+    { id: "gfm", name: "GFM 通用大模型基座", repository: "qiubo-master/GFM", branch: "master", description: "统一提供文本、Embedding、视觉检测、OCR 与多模态 API", endpoint: "等待配置访问地址", resourceManaged: false, targetIds: ["autodl2"] },
+    { id: "otel", name: "Otel 可观测平台", repository: "qiubo-master/Otel", branch: "main", description: "统一采集指标、链路与日志，提供 Grafana、Prometheus、Tempo 和 Elasticsearch 可观测能力", manualUrl: "https://github.com/qiubo-master/Otel/blob/main/docs/OPERATIONS.md", endpoint: "http://100.103.132.88:3000", resourceManaged: true, targetIds: ["aliyun-main"] },
+    { id: "deploy-center", name: "CI/CD 发布控制中心", repository: "qiubo-master/CSS-Deploy-Center", branch: "master", description: "本控制台自身，支持自举发布", endpoint: "http://100.103.132.88", resourceManaged: false, targetIds: ["aliyun-main"] },
   ],
   project: { id: "media", name: "序章自媒体中台", repository: "qiubo-master/Media", branch: "main", description: "内容生产、账号矩阵与 AI 决策中台", endpoint: "http://47.113.191.114:8080", resourceManaged: true, targetIds: ["aliyun-main"] },
   service: { status: "healthy", version: "—", endpoint: "http://47.113.191.114:8080", latency: "—" },
@@ -106,7 +109,7 @@ export default function Home() {
         <section className="projectStrip" aria-label="部署项目">{data.projects.map((project) => <button key={project.id} className={projectId === project.id ? "projectCard selected" : "projectCard"} onClick={() => selectProject(project.id)}><span>{project.id === "media" ? "ME" : "AI"}</span><div><b>{project.name}</b><small>{project.repository}</small><small>{project.endpoint.startsWith("http") ? <a href={project.endpoint} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>{project.endpoint}</a> : project.endpoint}</small></div><em>{projectId === project.id ? "当前项目" : "查看项目"}</em></button>)}</section>
 
         <section className="releaseHero" id="release">
-          <div className="releaseInfo"><div className="eyebrow"><span className="pulse"/> VERSION DELIVERY</div><h2>{data.project.name}</h2><p>{data.project.description}</p><div className="versionFlow"><div><small>线上版本</small><code>{data.version.deployed ?? data.service.version}</code></div><span>→</span><div><small>GitHub master</small><code>{data.version.latest?.sha ?? "等待同步"}</code></div>{data.version.updateAvailable && <b className="updateTag">有新版本</b>}</div>{data.version.latest && <p className="commitMessage">{data.version.latest.message} · {data.version.latest.author}</p>}</div>
+          <div className="releaseInfo"><div className="eyebrow"><span className="pulse"/> VERSION DELIVERY</div><h2>{data.project.name}</h2><p>{data.project.description}</p><div className="projectLinks">{data.project.endpoint.startsWith("http") && <a href={data.project.endpoint} target="_blank" rel="noreferrer">访问项目 ↗</a>}<a href={data.project.manualUrl ?? `https://github.com/${data.project.repository}/blob/${data.project.branch}/README.md`} target="_blank" rel="noreferrer">操作手册 ↗</a></div><div className="versionFlow"><div><small>线上版本</small><code>{data.version.deployed ?? data.service.version}</code></div><span>→</span><div><small>GitHub {data.project.branch}</small><code>{data.version.latest?.sha ?? "等待同步"}</code></div>{data.version.updateAvailable && <b className="updateTag">有新版本</b>}</div>{data.version.latest && <p className="commitMessage">{data.version.latest.message} · {data.version.latest.author}</p>}</div>
           <div className="releaseActions"><button className="releaseButton" onClick={() => trigger("release")} disabled={!!busy || latestRun?.status === "in_progress"}>{busy === "release" ? "正在创建流水线…" : "发布最新版本"}</button><button className="rollbackButton" onClick={() => trigger("rollback")} disabled={!!busy}>回滚上一版本</button></div>
         </section>
         {notice && <div className="notice" role="status">{notice}</div>}{data.error && <div className="notice warning">状态同步提示：{data.error}</div>}
