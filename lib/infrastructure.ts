@@ -55,8 +55,14 @@ const defaultTargets: ServerTarget[] = [{
   address: process.env.DEPLOY_HOST ?? "47.113.191.114",
   monitorUrl: process.env.ALIYUN_MONITOR_URL ?? "http://host.docker.internal:9108/v1/resources",
   monitorToken: process.env.MONITOR_AGENT_TOKEN,
-  projectIds: ["css", "media"],
+  projectIds: ["css", "media", "otel", "deploy-center"],
 }];
+
+function withBuiltInBindings(targets: ServerTarget[]) {
+  return targets.map((target) => target.id === "aliyun-main"
+    ? { ...target, projectIds: [...new Set([...target.projectIds, "otel", "deploy-center"])] }
+    : target);
+}
 
 function validTargets(value: unknown): value is ServerTarget[] {
   return Array.isArray(value) && value.every((item) => item && typeof item.id === "string" && typeof item.name === "string" && Array.isArray(item.projectIds));
@@ -65,15 +71,15 @@ function validTargets(value: unknown): value is ServerTarget[] {
 export async function serverTargets(): Promise<ServerTarget[]> {
   try {
     const stored = JSON.parse(await readFile(inventoryFile, "utf8"));
-    if (validTargets(stored)) return stored;
+    if (validTargets(stored)) return withBuiltInBindings(stored);
   } catch { /* initialize from environment/defaults */ }
   if (process.env.SERVER_INVENTORY_JSON) {
     try {
       const configured = JSON.parse(process.env.SERVER_INVENTORY_JSON);
-      if (validTargets(configured)) return configured;
+      if (validTargets(configured)) return withBuiltInBindings(configured);
     } catch { /* use defaults */ }
   }
-  return defaultTargets;
+  return withBuiltInBindings(defaultTargets);
 }
 
 export async function saveServerTargets(targets: ServerTarget[]) {
