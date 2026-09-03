@@ -48,20 +48,29 @@ const inventoryFile = join(process.env.CONTROL_CENTER_DATA_DIR ?? "/app/data", "
 const credentialsFile = join(process.env.CONTROL_CENTER_DATA_DIR ?? "/app/data", "server-credentials.json");
 const defaultTargets: ServerTarget[] = [{
   id: "aliyun-main",
-  name: "阿里云生产服务器",
+  name: "新生产服务器",
   provider: "阿里云",
   kind: "cloud",
-  region: process.env.ALIYUN_REGION ?? "cn-hangzhou",
-  address: process.env.DEPLOY_HOST ?? "47.113.191.114",
+  region: process.env.ALIYUN_REGION ?? "Tailscale 私网",
+  address: process.env.PRIMARY_SERVER_ADDRESS ?? "100.103.132.88",
   monitorUrl: process.env.ALIYUN_MONITOR_URL ?? "http://host.docker.internal:9108/v1/resources",
   monitorToken: process.env.MONITOR_AGENT_TOKEN,
   projectIds: ["css", "media", "otel", "deploy-center"],
 }];
 
 function withBuiltInBindings(targets: ServerTarget[]) {
-  return targets.map((target) => target.id === "aliyun-main"
-    ? { ...target, projectIds: [...new Set([...target.projectIds, "otel", "deploy-center"])] }
-    : target);
+  const retired = (target: ServerTarget) => target.name.replace(/[\s_-]/g, "").toLowerCase() === "autodlgpu01";
+  const storedMain = targets.find((target) => target.id === "aliyun-main");
+  const main = {
+    ...storedMain,
+    ...defaultTargets[0],
+    projectIds: [...new Set([...(storedMain?.projectIds ?? defaultTargets[0].projectIds), "otel", "deploy-center"])]
+      .filter((id) => id !== "ai-wms" && id !== "ai-ops"),
+  };
+  return [main, ...targets.filter((target) => target.id !== "aliyun-main" && !retired(target)).map((target) => ({
+    ...target,
+    projectIds: target.projectIds.filter((id) => id !== "ai-wms" && id !== "ai-ops"),
+  }))];
 }
 
 function validTargets(value: unknown): value is ServerTarget[] {

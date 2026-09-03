@@ -27,8 +27,7 @@ const seed: Dashboard = {
   projects: [
     { id: "css", name: "智能客服", repository: "qiubo-master/CSS", branch: "main", description: "现有智能客服生产服务", endpoint: "等待配置", resourceManaged: false, targetIds: ["aliyun-main"] },
     { id: "media", name: "序章自媒体中台", repository: "qiubo-master/Media", branch: "main", description: "内容生产、账号矩阵与 AI 决策中台", endpoint: "http://47.113.191.114:8080", resourceManaged: true, targetIds: ["aliyun-main"] },
-    { id: "ai-wms", name: "AI供应链智能备货", repository: "qiubo-master/AI_WMS", branch: "main", description: "轮胎需求预测、库存监控与AI解释演示系统", endpoint: "http://47.120.61.139", resourceManaged: false, targetIds: ["aliyun2"] },
-    { id: "ai-ops", name: "AI运营", repository: "qiubo-master/AI_OPS", branch: "main", description: "AI数字化培训、AI图像检测、AI维修诊断与AI保养报价", endpoint: "等待首次发布", resourceManaged: false, targetIds: ["aliyun2"] },
+    { id: "word-game", name: "WordGame 单词闯关", repository: "qiubo-master/WordGame", branch: "master", description: "支持账号、闯关和进度存档的单词学习游戏", manualUrl: "https://github.com/qiubo-master/WordGame/blob/master/deploy-cloudbase.md", endpoint: "https://wordgame-1-d7gx6qvym115a8f41.tcloudbase.com", resourceManaged: false, targetIds: [] },
     { id: "gfm", name: "GFM 通用大模型基座", repository: "qiubo-master/GFM", branch: "master", description: "统一提供文本、Embedding、视觉检测、OCR 与多模态 API", endpoint: "等待配置访问地址", resourceManaged: false, targetIds: ["autodl2"] },
     { id: "otel", name: "Otel 可观测平台", repository: "qiubo-master/Otel", branch: "main", description: "统一采集指标、链路与日志，提供 Grafana、Prometheus、Tempo 和 Elasticsearch 可观测能力", manualUrl: "https://github.com/qiubo-master/Otel/blob/main/docs/OPERATIONS.md", endpoint: "http://100.103.132.88:3000", resourceManaged: true, targetIds: ["aliyun-main"] },
     { id: "deploy-center", name: "CI/CD 发布控制中心", repository: "qiubo-master/CSS-Deploy-Center", branch: "master", description: "本控制台自身，支持自举发布", endpoint: "http://100.103.132.88", resourceManaged: false, targetIds: ["aliyun-main"] },
@@ -43,7 +42,7 @@ const seed: Dashboard = {
     { id: "standard", name: "标准", cpu: "2.0", memory: "2g", databaseMemory: "1g", note: "推荐生产配置" },
     { id: "large", name: "增强", cpu: "4.0", memory: "4g", databaseMemory: "2g", note: "高并发内容生产" },
   ],
-  servers: [{ id: "aliyun-main", name: "阿里云生产服务器", provider: "阿里云", kind: "cloud", region: "华东", address: "47.113.191.114", projectIds: ["css", "media", "gfm"], status: "unconfigured", snapshot: null, capacity: { eligible: false, level: "unknown", reason: "监控代理未接入，无法安全下发" } }],
+  servers: [{ id: "aliyun-main", name: "新生产服务器", provider: "阿里云", kind: "cloud", region: "Tailscale 私网", address: "100.103.132.88", projectIds: ["css", "media", "otel", "deploy-center"], status: "unconfigured", snapshot: null, capacity: { eligible: false, level: "unknown", reason: "监控代理未接入，无法安全下发" } }],
 };
 
 function stateOf(run: Pipeline) {
