@@ -49,14 +49,66 @@ jobs:
           printf '%s\n' "$SSH_HOST_KEY" > ~/.ssh/known_hosts
       - name: Upload release
         if: github.event_name != 'workflow_dispatch' || inputs.action == 'deploy'
+        timeout-minutes: 90
         env:
           HOST: ${{ secrets.DEPLOY_HOST }}
           PORT: ${{ secrets.DEPLOY_PORT }}
           USER: ${{ secrets.DEPLOY_USER }}
         run: |
+          set -euo pipefail
+          source_archive=/tmp/control-center.tgz
+          image_archive="/tmp/css-deploy-center-image-${GITHUB_SHA}.tar.gz"
+          upload_dir="/tmp/control-center-upload-${GITHUB_SHA}"
+          ssh_options=(
+            -i ~/.ssh/deploy_key
+            -o ConnectTimeout=20
+            -o ServerAliveInterval=15
+            -o ServerAliveCountMax=20
+            -o TCPKeepAlive=yes
+            -o IPQoS=throughput
+          )
+
           tar --exclude=.git --exclude=node_modules -czf /tmp/control-center.tgz .
-          scp -i ~/.ssh/deploy_key -P "$PORT" /tmp/control-center.tgz "$USER@$HOST:/tmp/control-center-${GITHUB_SHA}.tgz"
-          scp -i ~/.ssh/deploy_key -P "$PORT" "/tmp/css-deploy-center-image-${GITHUB_SHA}.tar.gz" "$USER@$HOST:/tmp/css-deploy-center-image-${GITHUB_SHA}.tar.gz"
+          echo "待上传文件："
+          du -h "$source_archive" "$image_archive"
+
+          echo "检查 SSH 与服务器临时目录空间"
+          timeout 45s ssh "${ssh_options[@]}" -p "$PORT" "$USER@$HOST" \
+            "install -d -m 700 '$upload_dir' && df -h /tmp"
+
+          upload_with_retry() {
+            local source=$1
+            local destination=$2
+            local label=$3
+            for attempt in 1 2 3; do
+              echo "上传 ${label}（第 ${attempt}/3 次）"
+              if timeout 20m scp "${ssh_options[@]}" -P "$PORT" "$source" "$USER@$HOST:$destination"; then
+                return 0
+              fi
+              echo "${label} 上传中断，15 秒后重试"
+              sleep 15
+            done
+            echo "${label} 连续三次上传失败"
+            return 1
+          }
+
+          upload_with_retry "$source_archive" "$upload_dir/control-center.tgz" "源码包"
+
+          echo "将 Docker 镜像切分为 50MB 分片"
+          split -b 50M -d -a 3 "$image_archive" "$image_archive.part-"
+          (cd /tmp && sha256sum "$(basename "$image_archive")" > "$(basename "$image_archive").sha256")
+          part_count=$(find /tmp -maxdepth 1 -name "$(basename "$image_archive").part-*" | wc -l)
+          echo "镜像共 ${part_count} 个分片"
+          for part in "$image_archive".part-*; do
+            upload_with_retry "$part" "$upload_dir/$(basename "$part")" "镜像分片 $(basename "$part")"
+          done
+          upload_with_retry "$image_archive.sha256" "$upload_dir/$(basename "$image_archive").sha256" "镜像校验文件"
+
+          echo "服务器端合并并校验镜像"
+          ssh "${ssh_options[@]}" -p "$PORT" "$USER@$HOST" \
+            "cat '$upload_dir/$(basename "$image_archive")'.part-* > '$image_archive' && \
+             mv '$upload_dir/control-center.tgz' '/tmp/control-center-${GITHUB_SHA}.tgz' && \
+             cd /tmp && sha256sum -c '$upload_dir/$(basename "$image_archive").sha256'"
       - name: Activate release
         if: github.event_name != 'workflow_dispatch' || inputs.action == 'deploy'
         env:
@@ -64,7 +116,7 @@ jobs:
           PORT: ${{ secrets.DEPLOY_PORT }}
           USER: ${{ secrets.DEPLOY_USER }}
         run: |
-          ssh -i ~/.ssh/deploy_key -p "$PORT" "$USER@$HOST" \
+          ssh -i ~/.ssh/deploy_key -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=20 -p "$PORT" "$USER@$HOST" \
             "RELEASE_SHA=$GITHUB_SHA ARCHIVE=/tmp/control-center-${GITHUB_SHA}.tgz IMAGE_ARCHIVE=/tmp/css-deploy-center-image-${GITHUB_SHA}.tar.gz bash -s" \
             < ops/deploy-control-center.sh
       - name: Roll back release
@@ -74,4 +126,4 @@ jobs:
           PORT: ${{ secrets.DEPLOY_PORT }}
           USER: ${{ secrets.DEPLOY_USER }}
         run: |
-          ssh -i ~/.ssh/deploy_key -p "$PORT" "$USER@$HOST" "bash -s" < ops/rollback-control-center.sh
+          ssh -i ~/.ssh/deploy_key -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=20 -p "$PORT" "$USER@$HOST" "bash -s" < ops/rollback-control-center.sh
