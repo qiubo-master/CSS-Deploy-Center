@@ -86,6 +86,7 @@ test("control-center API returns a usable demo dashboard", async () => {
   const otel = body.projects.find((project) => project.repository === "qiubo-master/Otel");
   assert.equal(otel.branch, "main");
   assert.match(otel.manualUrl, /docs\/OPERATIONS\.md$/);
+  assert.equal(otel.projectUrl, "http://100.103.132.88:8103");
   assert.ok(Array.isArray(body.servers));
   assert.equal(body.servers[0].address, "100.103.132.88");
   assert.ok(!body.servers.some((server) => server.name.replace(/[\s_-]/g, "").toLowerCase() === "autodlgpu01"));
