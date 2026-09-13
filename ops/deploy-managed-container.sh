@@ -15,13 +15,13 @@ validate() {
       [[ "$IMAGE_REPOSITORY" == "crpi-73ce4hnji7xum4zi.cn-heyuan.personal.cr.aliyuncs.com/qiubo-master/ontology" ]]
       [[ "$CONTAINER_PORT" == "8000" ]]
       [[ "$HEALTH_PATH" == "/api/health" ]]
-      [[ "$DEPLOY_ROOT" == "/opt/ontology-platform" ]]
+      [[ "$DEPLOY_ROOT" == "/opt/css-deploy-center/managed/ontology" ]]
       ;;
     ai-wms)
       [[ "$IMAGE_REPOSITORY" == "crpi-73ce4hnji7xum4zi.cn-heyuan.personal.cr.aliyuncs.com/qiubo-master/ai-wms" ]]
       [[ "$CONTAINER_PORT" == "3000" ]]
       [[ "$HEALTH_PATH" == "/api/health" ]]
-      [[ "$DEPLOY_ROOT" == "/opt/ai-wms" ]]
+      [[ "$DEPLOY_ROOT" == "/opt/css-deploy-center/managed/ai-wms" ]]
       ;;
     *) echo "Unsupported managed project: $PROJECT_ID" >&2; exit 1 ;;
   esac
