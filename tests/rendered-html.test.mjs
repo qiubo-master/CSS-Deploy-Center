@@ -28,7 +28,9 @@ test("server-renders the CI/CD control center", async () => {
   assert.match(html, /序章自媒体中台/);
   assert.match(html, /汽车后市场 Ontology/);
   assert.match(html, /WordGame 单词闯关/);
-  assert.doesNotMatch(html, /AI供应链智能备货|AI运营/);
+  assert.match(html, /AI运营/);
+  assert.match(html, /AI供应链/);
+  assert.match(html, /Eval 评测系统/);
   assert.match(html, /项目管理/);
   assert.match(html, /Otel 可观测平台/);
   assert.match(html, /href="\/resources"/);
@@ -66,8 +68,10 @@ test("control-center API returns a usable demo dashboard", async () => {
   assert.equal(response.status, 200);
   const body = await response.json();
   assert.equal(body.mode, "demo");
-  assert.equal(body.project.repository, "qiubo-master/Media");
-  assert.equal(body.projects.length, 7);
+  assert.equal(body.project.repository, "qiubo-master/Ontology");
+  assert.equal(body.projects.length, 10);
+  assert.deepEqual(body.projects.slice(0, 4).map((project) => project.id), ["ontology", "css", "ai-ops", "ai-wms"]);
+  assert.equal(body.projects.at(-1).id, "eval");
   const ontology = body.projects.find((project) => project.repository === "qiubo-master/Ontology");
   assert.equal(ontology.branch, "master");
   assert.match(ontology.endpoint, /:8090$/);
@@ -75,8 +79,8 @@ test("control-center API returns a usable demo dashboard", async () => {
   const wordGame = body.projects.find((project) => project.repository === "qiubo-master/WordGame");
   assert.equal(wordGame.branch, "master");
   assert.match(wordGame.manualUrl, /deploy-cloudbase\.md$/);
-  assert.ok(!body.projects.some((project) => project.repository === "qiubo-master/AI_WMS"));
-  assert.ok(!body.projects.some((project) => project.repository === "qiubo-master/AI_OPS"));
+  assert.equal(body.projects.find((project) => project.id === "ai-wms").projectUrl, "https://github.com/qiubo-master/AI_WMS");
+  assert.equal(body.projects.find((project) => project.id === "ai-ops").projectUrl, "https://github.com/qiubo-master/AI_OPS");
   assert.ok(body.projects.some((project) => project.repository === "qiubo-master/GFM"));
   const otel = body.projects.find((project) => project.repository === "qiubo-master/Otel");
   assert.equal(otel.branch, "main");

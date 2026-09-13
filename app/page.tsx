@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 
 type ProjectId = string;
-type Project = { id: ProjectId; name: string; repository: string; branch: string; description: string; manualUrl?: string; endpoint: string; resourceManaged: boolean; targetIds: string[] };
+type Project = { id: ProjectId; name: string; repository: string; branch: string; description: string; projectUrl?: string; manualUrl?: string; endpoint: string; resourceManaged: boolean; targetIds: string[] };
 type Profile = { id: string; name: string; cpu: string; memory: string; databaseMemory: string; note: string };
 type Pipeline = { id: string; number: number; name: string; status: string; conclusion: string | null; commit: string; branch: string; event: string; actor: string; createdAt: string; duration: string; url: string };
 type ProjectUsage = { projectId: string; containerCount: number; cpuUsedPercent: number; memoryUsedMb: number; memoryLimitMb: number; containers: string[] };
@@ -25,16 +25,19 @@ type Dashboard = {
 const seed: Dashboard = {
   mode: "demo",
   projects: [
-    { id: "css", name: "智能客服", repository: "qiubo-master/CSS", branch: "main", description: "现有智能客服生产服务", endpoint: "等待配置", resourceManaged: false, targetIds: ["aliyun-main"] },
     { id: "ontology", name: "汽车后市场 Ontology", repository: "qiubo-master/Ontology", branch: "master", description: "智能客服意图、对象、规则、能力与决策链路运行平台", endpoint: "http://100.103.132.88:8090", resourceManaged: true, targetIds: ["aliyun-main"] },
-    { id: "media", name: "序章自媒体中台", repository: "qiubo-master/Media", branch: "main", description: "内容生产、账号矩阵与 AI 决策中台", endpoint: "http://47.113.191.114:8080", resourceManaged: true, targetIds: ["aliyun-main"] },
+    { id: "css", name: "智能客服", repository: "qiubo-master/CSS", branch: "master", description: "汽车后市场智能客服与轮胎业务服务", projectUrl: "https://github.com/qiubo-master/CSS", endpoint: "尚未配置线上访问地址", resourceManaged: false, targetIds: ["aliyun-main"] },
+    { id: "ai-ops", name: "AI运营", repository: "qiubo-master/AI_OPS", branch: "master", description: "门店运营、巡检与业务编排智能平台", projectUrl: "https://github.com/qiubo-master/AI_OPS", endpoint: "尚未部署线上页面", resourceManaged: true, targetIds: ["aliyun-main"] },
+    { id: "ai-wms", name: "AI供应链", repository: "qiubo-master/AI_WMS", branch: "master", description: "供应链智能备货与仓储决策平台", projectUrl: "https://github.com/qiubo-master/AI_WMS", endpoint: "尚未部署线上页面", resourceManaged: true, targetIds: ["aliyun-main"] },
+    { id: "media", name: "序章自媒体中台", repository: "qiubo-master/Media", branch: "master", description: "内容生产、账号矩阵与 AI 决策中台", endpoint: "http://100.103.132.88:8080", resourceManaged: true, targetIds: ["aliyun-main"] },
     { id: "word-game", name: "WordGame 单词闯关", repository: "qiubo-master/WordGame", branch: "master", description: "支持账号、闯关和进度存档的单词学习游戏", manualUrl: "https://github.com/qiubo-master/WordGame/blob/master/deploy-cloudbase.md", endpoint: "https://wordgame-1-d7gx6qvym115a8f41.tcloudbase.com", resourceManaged: false, targetIds: [] },
     { id: "gfm", name: "GFM 通用大模型基座", repository: "qiubo-master/GFM", branch: "master", description: "统一提供文本、Embedding、视觉检测、OCR 与多模态 API", endpoint: "等待配置访问地址", resourceManaged: false, targetIds: ["autodl2"] },
-    { id: "otel", name: "Otel 可观测平台", repository: "qiubo-master/Otel", branch: "main", description: "统一采集指标、链路与日志，提供 Grafana、Prometheus、Tempo 和 Elasticsearch 可观测能力", manualUrl: "https://github.com/qiubo-master/Otel/blob/main/docs/OPERATIONS.md", endpoint: "http://100.103.132.88:3000", resourceManaged: true, targetIds: ["aliyun-main"] },
+    { id: "otel", name: "Otel 可观测平台", repository: "qiubo-master/Otel", branch: "main", description: "统一采集指标、链路与日志，提供 Grafana、Prometheus、Tempo 和 Elasticsearch 可观测能力", projectUrl: "https://github.com/qiubo-master/Otel", manualUrl: "https://github.com/qiubo-master/Otel/blob/main/docs/OPERATIONS.md", endpoint: "尚未配置线上访问地址", resourceManaged: true, targetIds: ["aliyun-main"] },
     { id: "deploy-center", name: "CI/CD 发布控制中心", repository: "qiubo-master/CSS-Deploy-Center", branch: "master", description: "本控制台自身，支持自举发布", endpoint: "http://100.103.132.88", resourceManaged: false, targetIds: ["aliyun-main"] },
+    { id: "eval", name: "Eval 评测系统", repository: "qiubo-master/eval", branch: "master", description: "大模型、Prompt 与应用效果评测系统", projectUrl: "https://github.com/qiubo-master/eval", endpoint: "尚未部署线上页面", resourceManaged: false, targetIds: [] },
   ],
-  project: { id: "media", name: "序章自媒体中台", repository: "qiubo-master/Media", branch: "main", description: "内容生产、账号矩阵与 AI 决策中台", endpoint: "http://47.113.191.114:8080", resourceManaged: true, targetIds: ["aliyun-main"] },
-  service: { status: "healthy", version: "—", endpoint: "http://47.113.191.114:8080", latency: "—" },
+  project: { id: "ontology", name: "汽车后市场 Ontology", repository: "qiubo-master/Ontology", branch: "master", description: "智能客服意图、对象、规则、能力与决策链路运行平台", endpoint: "http://100.103.132.88:8090", resourceManaged: true, targetIds: ["aliyun-main"] },
+  service: { status: "healthy", version: "—", endpoint: "http://100.103.132.88:8090", latency: "—" },
   version: { latest: null, deployed: null, updateAvailable: false },
   pipelines: [],
   latestSteps: [],
@@ -55,7 +58,7 @@ function stateOf(run: Pipeline) {
 
 export default function Home() {
   const [data, setData] = useState(seed);
-  const [projectId, setProjectId] = useState<ProjectId>("media");
+  const [projectId, setProjectId] = useState<ProjectId>("ontology");
   const [busy, setBusy] = useState<"release" | "rollback" | null>(null);
   const [notice, setNotice] = useState("");
 
@@ -106,10 +109,10 @@ export default function Home() {
       <header className="topbar"><div><span className="crumb">阿里云 / 共享公网 IP / Docker</span><h1>CI/CD 发布控制中心</h1></div><div className="topActions"><span className={`mode ${data.mode}`}>{data.mode === "live" ? "LIVE" : "DEMO"}</span><button className="iconButton" onClick={() => load()} aria-label="刷新">↻</button></div></header>
       <div className="content">
         <section id="projects" className="overviewHead"><div><span className="kicker">PROJECT PORTFOLIO</span><h2>项目管理</h2><p>以项目为中心管理代码仓库、部署目标、运行状态和发布流水线。</p></div><span>{data.projects.length} 个项目</span></section>
-        <section className="projectStrip" aria-label="部署项目">{data.projects.map((project) => <button key={project.id} className={projectId === project.id ? "projectCard selected" : "projectCard"} onClick={() => selectProject(project.id)}><span>{project.id === "media" ? "ME" : "AI"}</span><div><b>{project.name}</b><small>{project.repository}</small><small>{project.endpoint.startsWith("http") ? <a href={project.endpoint} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>{project.endpoint}</a> : project.endpoint}</small></div><em>{projectId === project.id ? "当前项目" : "查看项目"}</em></button>)}</section>
+        <section className="projectStrip" aria-label="部署项目">{data.projects.map((project) => { const projectUrl = project.projectUrl ?? (project.endpoint.startsWith("http") ? project.endpoint : `https://github.com/${project.repository}`); return <button key={project.id} className={projectId === project.id ? "projectCard selected" : "projectCard"} onClick={() => selectProject(project.id)}><span>{project.id === "media" ? "ME" : "AI"}</span><div><b>{project.name}</b><small><a href={projectUrl} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()}>访问项目 ↗</a></small><small><a href={`https://github.com/${project.repository}`} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()}>{project.repository}</a></small></div><em>{projectId === project.id ? "当前项目" : "查看详情"}</em></button>; })}</section>
 
         <section className="releaseHero" id="release">
-          <div className="releaseInfo"><div className="eyebrow"><span className="pulse"/> VERSION DELIVERY</div><h2>{data.project.name}</h2><p>{data.project.description}</p><div className="projectLinks">{data.project.endpoint.startsWith("http") && <a href={data.project.endpoint} target="_blank" rel="noreferrer">访问项目 ↗</a>}<a href={data.project.manualUrl ?? `https://github.com/${data.project.repository}/blob/${data.project.branch}/README.md`} target="_blank" rel="noreferrer">操作手册 ↗</a></div><div className="versionFlow"><div><small>线上版本</small><code>{data.version.deployed ?? data.service.version}</code></div><span>→</span><div><small>GitHub {data.project.branch}</small><code>{data.version.latest?.sha ?? "等待同步"}</code></div>{data.version.updateAvailable && <b className="updateTag">有新版本</b>}</div>{data.version.latest && <p className="commitMessage">{data.version.latest.message} · {data.version.latest.author}</p>}</div>
+          <div className="releaseInfo"><div className="eyebrow"><span className="pulse"/> VERSION DELIVERY</div><h2>{data.project.name}</h2><p>{data.project.description}</p><div className="projectLinks"><a href={data.project.projectUrl ?? (data.project.endpoint.startsWith("http") ? data.project.endpoint : `https://github.com/${data.project.repository}`)} target="_blank" rel="noreferrer">访问项目 ↗</a><a href={data.project.manualUrl ?? `https://github.com/${data.project.repository}/blob/${data.project.branch}/README.md`} target="_blank" rel="noreferrer">操作手册 ↗</a></div><div className="versionFlow"><div><small>线上版本</small><code>{data.version.deployed ?? data.service.version}</code></div><span>→</span><div><small>GitHub {data.project.branch}</small><code>{data.version.latest?.sha ?? "等待同步"}</code></div>{data.version.updateAvailable && <b className="updateTag">有新版本</b>}</div>{data.version.latest && <p className="commitMessage">{data.version.latest.message} · {data.version.latest.author}</p>}</div>
           <div className="releaseActions"><button className="releaseButton" onClick={() => trigger("release")} disabled={!!busy || latestRun?.status === "in_progress"}>{busy === "release" ? "正在创建流水线…" : "发布最新版本"}</button><button className="rollbackButton" onClick={() => trigger("rollback")} disabled={!!busy}>回滚上一版本</button></div>
         </section>
         {notice && <div className="notice" role="status">{notice}</div>}{data.error && <div className="notice warning">状态同步提示：{data.error}</div>}
