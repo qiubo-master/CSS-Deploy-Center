@@ -34,7 +34,7 @@ const seed: Dashboard = {
     { id: "gfm", name: "GFM 通用大模型基座", repository: "qiubo-master/GFM", branch: "master", description: "统一提供文本、Embedding、视觉检测、OCR 与多模态 API", endpoint: "等待配置访问地址", resourceManaged: false, targetIds: ["autodl2"] },
     { id: "otel", name: "Otel 可观测平台", repository: "qiubo-master/Otel", branch: "main", description: "统一采集指标、链路与日志，提供 Grafana、Prometheus、Tempo 和 Elasticsearch 可观测能力", projectUrl: "http://100.103.132.88:8103", manualUrl: "https://github.com/qiubo-master/Otel/blob/main/docs/OPERATIONS.md", endpoint: "http://100.103.132.88:8103", resourceManaged: true, targetIds: ["aliyun-main"] },
     { id: "deploy-center", name: "CI/CD 发布控制中心", repository: "qiubo-master/CSS-Deploy-Center", branch: "master", description: "本控制台自身，支持自举发布", endpoint: "http://100.103.132.88", resourceManaged: false, targetIds: ["aliyun-main"] },
-    { id: "eval", name: "Eval 评测系统", repository: "qiubo-master/eval", branch: "master", description: "大模型、Prompt 与应用效果评测系统", projectUrl: "https://github.com/qiubo-master/eval", endpoint: "尚未部署线上页面", resourceManaged: false, targetIds: [] },
+    { id: "eval", name: "Eval 评测系统", repository: "qiubo-master/eval", branch: "master", description: "大模型、Prompt 与应用效果评测系统", projectUrl: "http://100.103.132.88:8104", endpoint: "http://100.103.132.88:8104", resourceManaged: true, targetIds: ["aliyun-main"] },
   ],
   project: { id: "ontology", name: "汽车后市场 Ontology", repository: "qiubo-master/Ontology", branch: "master", description: "智能客服意图、对象、规则、能力与决策链路运行平台", endpoint: "http://100.103.132.88:8090", resourceManaged: true, targetIds: ["aliyun-main"] },
   service: { status: "healthy", version: "—", endpoint: "http://100.103.132.88:8090", latency: "—" },
