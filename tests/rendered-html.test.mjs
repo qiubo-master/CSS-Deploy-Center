@@ -82,6 +82,7 @@ test("control-center API returns a usable demo dashboard", async () => {
   assert.equal(body.projects.find((project) => project.id === "ai-wms").projectUrl, "http://100.103.132.88:8102");
   assert.equal(body.projects.find((project) => project.id === "ai-ops").projectUrl, "http://100.103.132.88:8101");
   assert.equal(body.projects.find((project) => project.id === "css").projectUrl, "http://100.103.132.88:8100");
+  assert.equal(body.projects.find((project) => project.id === "media").projectUrl, "http://100.103.132.88:8080");
   assert.ok(body.projects.some((project) => project.repository === "qiubo-master/GFM"));
   assert.equal(body.projects.find((project) => project.id === "gfm").projectUrl, undefined);
   assert.deepEqual(body.projects.find((project) => project.id === "gfm").targetIds, []);
