@@ -1,0 +1,100 @@
+name: eval-platform
+
+x-langfuse-env: &langfuse-env
+  DATABASE_URL: postgresql://langfuse:${POSTGRES_PASSWORD:?required}@postgres:5432/langfuse
+  NEXTAUTH_URL: http://100.103.132.88:8104
+  NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:?required}
+  SALT: ${LANGFUSE_SALT:?required}
+  ENCRYPTION_KEY: ${ENCRYPTION_KEY:?required}
+  TELEMETRY_ENABLED: "false"
+  CLICKHOUSE_MIGRATION_URL: clickhouse://clickhouse:9000
+  CLICKHOUSE_URL: http://clickhouse:8123
+  CLICKHOUSE_USER: langfuse
+  CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?required}
+  CLICKHOUSE_CLUSTER_ENABLED: "false"
+  REDIS_HOST: redis
+  REDIS_PORT: 6379
+  REDIS_AUTH: ${REDIS_PASSWORD:?required}
+  REDIS_TLS_ENABLED: "false"
+  LANGFUSE_S3_EVENT_UPLOAD_BUCKET: langfuse
+  LANGFUSE_S3_EVENT_UPLOAD_REGION: auto
+  LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: ${MINIO_ROOT_USER:?required}
+  LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:?required}
+  LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: http://minio:9000
+  LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: "true"
+
+services:
+  langfuse-web:
+    image: crpi-73ce4hnji7xum4zi.cn-heyuan.personal.cr.aliyuncs.com/qiubo-master/langfuse:3
+    restart: unless-stopped
+    depends_on:
+      postgres: { condition: service_healthy }
+      clickhouse: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      minio: { condition: service_healthy }
+    ports: ["0.0.0.0:8104:3000"]
+    environment: *langfuse-env
+
+  langfuse-worker:
+    image: crpi-73ce4hnji7xum4zi.cn-heyuan.personal.cr.aliyuncs.com/qiubo-master/langfuse-worker:3
+    restart: unless-stopped
+    depends_on: [postgres, clickhouse, redis, minio]
+    environment: *langfuse-env
+
+  postgres:
+    image: crpi-73ce4hnji7xum4zi.cn-heyuan.personal.cr.aliyuncs.com/qiubo-master/postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: langfuse
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?required}
+      POSTGRES_DB: langfuse
+    volumes: ["langfuse-postgres:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U langfuse -d langfuse"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  clickhouse:
+    image: crpi-73ce4hnji7xum4zi.cn-heyuan.personal.cr.aliyuncs.com/qiubo-master/clickhouse-server:24
+    restart: unless-stopped
+    environment:
+      CLICKHOUSE_USER: langfuse
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?required}
+    volumes: ["langfuse-clickhouse:/var/lib/clickhouse"]
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8123/ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  redis:
+    image: crpi-73ce4hnji7xum4zi.cn-heyuan.personal.cr.aliyuncs.com/qiubo-master/redis:7
+    restart: unless-stopped
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:?required}"]
+    volumes: ["langfuse-redis:/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a '${REDIS_PASSWORD}' ping | grep PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  minio:
+    image: crpi-73ce4hnji7xum4zi.cn-heyuan.personal.cr.aliyuncs.com/qiubo-master/minio:latest
+    restart: unless-stopped
+    command: server --address ":9000" --console-address ":9001" /data
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?required}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?required}
+    volumes: ["langfuse-minio:/data"]
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  langfuse-postgres:
+  langfuse-clickhouse:
+  langfuse-redis:
+  langfuse-minio:
