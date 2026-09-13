@@ -1,0 +1,70 @@
+name: Provision Platform Administrators
+
+on:
+  repository_dispatch:
+    types: [provision-platform-admins]
+
+permissions:
+  contents: read
+
+jobs:
+  provision:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - name: Connect to deployment tailnet
+        uses: tailscale/github-action@v4
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+          ping: ${{ secrets.DEPLOY_HOST }}
+      - name: Configure SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          SSH_HOST_KEY: ${{ secrets.DEPLOY_HOST_KEY_CURRENT || secrets.DEPLOY_HOST_KEY }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$SSH_HOST_KEY" > ~/.ssh/known_hosts
+      - name: Upload current Eval policy
+        env:
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          PORT: ${{ secrets.DEPLOY_PORT }}
+          USER: ${{ secrets.DEPLOY_USER }}
+        run: scp -i ~/.ssh/deploy_key -P "$PORT" ops/docker-compose.eval-production.yml "$USER@$HOST:/tmp/docker-compose.eval-production.yml"
+      - name: Provision administrators without logging credentials
+        env:
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          PORT: ${{ secrets.DEPLOY_PORT }}
+          USER: ${{ secrets.DEPLOY_USER }}
+          OTEL_ADMIN_PASSWORD: ${{ github.event.client_payload.otel_password }}
+          EVAL_ADMIN_PASSWORD: ${{ github.event.client_payload.eval_password }}
+        run: |
+          [[ "$OTEL_ADMIN_PASSWORD" =~ ^[0-9a-f]{36}$ ]]
+          [[ "$EVAL_ADMIN_PASSWORD" =~ ^[0-9a-f]{36}$ ]]
+          ssh -i ~/.ssh/deploy_key -p "$PORT" "$USER@$HOST" \
+            "OTEL_ADMIN_PASSWORD=$OTEL_ADMIN_PASSWORD EVAL_ADMIN_PASSWORD=$EVAL_ADMIN_PASSWORD bash -s" <<'REMOTE'
+          set -euo pipefail
+          docker exec otel-platform-grafana-1 grafana cli admin reset-admin-password "$OTEL_ADMIN_PASSWORD" >/dev/null
+
+          root=/opt/css-deploy-center/managed/eval
+          current=$(readlink -f "$root/current")
+          test -n "$current"
+          install -m 600 /tmp/docker-compose.eval-production.yml "$current/docker-compose.yml"
+          rm -f /tmp/docker-compose.eval-production.yml
+          env_file="$root/shared/.env"
+          tmp_file="$root/shared/.env.next"
+          grep -vE '^LANGFUSE_INIT_(USER_EMAIL|USER_PASSWORD)=' "$env_file" > "$tmp_file" || true
+          printf 'LANGFUSE_INIT_USER_EMAIL=admin@local.invalid\nLANGFUSE_INIT_USER_PASSWORD=%s\n' "$EVAL_ADMIN_PASSWORD" >> "$tmp_file"
+          chmod 600 "$tmp_file"
+          mv "$tmp_file" "$env_file"
+          docker compose --env-file "$env_file" -f "$current/docker-compose.yml" up -d --force-recreate langfuse-web langfuse-worker >/dev/null
+          for attempt in $(seq 1 60); do
+            curl -fsS http://127.0.0.1:8104/api/public/health >/dev/null && exit 0
+            sleep 3
+          done
+          exit 1
+          REMOTE
