@@ -17,6 +17,12 @@ validate() {
       [[ "$HEALTH_PATH" == "/api/health" ]]
       [[ "$DEPLOY_ROOT" == "/opt/ontology-platform" ]]
       ;;
+    ai-wms)
+      [[ "$IMAGE_REPOSITORY" == "crpi-73ce4hnji7xum4zi.cn-heyuan.personal.cr.aliyuncs.com/qiubo-master/ai-wms" ]]
+      [[ "$CONTAINER_PORT" == "3000" ]]
+      [[ "$HEALTH_PATH" == "/api/health" ]]
+      [[ "$DEPLOY_ROOT" == "/opt/ai-wms" ]]
+      ;;
     *) echo "Unsupported managed project: $PROJECT_ID" >&2; exit 1 ;;
   esac
 }

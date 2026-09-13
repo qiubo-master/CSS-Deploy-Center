@@ -7,7 +7,7 @@ on:
       project_id: { description: Registered ForgeOps project ID, required: true }
       repository: { description: Exact owner/repository, required: true }
       target_sha: { description: Immutable target commit SHA, required: true }
-      action: { description: Deployment action, required: true, default: deploy, type: choice, options: [deploy, rollback] }
+      action: { description: Deployment action, required: true, default: deploy, type: choice, options: [deploy, deploy-existing, rollback] }
       resource_profile: { description: Auditable resource profile, required: true, default: standard }
       app_cpu: { description: CPU limit, required: true, default: "2.0" }
       app_memory: { description: Memory limit, required: true, default: "2g" }
@@ -54,6 +54,12 @@ jobs:
               echo "container_port=8000" >> "$GITHUB_OUTPUT"
               echo "health_path=/api/health" >> "$GITHUB_OUTPUT"
               echo "deploy_root=/opt/ontology-platform" >> "$GITHUB_OUTPUT"
+              ;;
+            ai-wms:qiubo-master/AI_WMS)
+              echo "image_repository=crpi-73ce4hnji7xum4zi.cn-heyuan.personal.cr.aliyuncs.com/qiubo-master/ai-wms" >> "$GITHUB_OUTPUT"
+              echo "container_port=3000" >> "$GITHUB_OUTPUT"
+              echo "health_path=/api/health" >> "$GITHUB_OUTPUT"
+              echo "deploy_root=/opt/ai-wms" >> "$GITHUB_OUTPUT"
               ;;
             *) echo "Project/repository is not allow-listed" >&2; exit 1 ;;
           esac
@@ -136,7 +142,7 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           printf '%s\n' "$SSH_HOST_KEY" > ~/.ssh/known_hosts
       - name: Pull immutable image on target
-        if: inputs.action == 'deploy'
+        if: inputs.action != 'rollback'
         env:
           HOST: ${{ secrets.DEPLOY_HOST }}
           PORT: ${{ secrets.DEPLOY_PORT }}
