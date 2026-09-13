@@ -101,8 +101,8 @@ jobs:
           PROJECT_ID: ${{ inputs.project_id }}
         run: |
           if [[ "$PROJECT_ID" == "css" ]]; then
-            python -m pip install ./source/local-demo 'pytest>=8.4,<9' 'pytest-asyncio>=1.1,<2'
-            python -m pytest source/local-demo/tests -q
+            python -m pip install ./local-demo 'pytest>=8.4,<9' 'pytest-asyncio>=1.1,<2'
+            python -m pytest local-demo/tests -q
           else
             python -m unittest discover -s tests -v
           fi
