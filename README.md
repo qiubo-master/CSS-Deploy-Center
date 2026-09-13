@@ -6,6 +6,8 @@
 
 Ontology 已作为内置项目接入，默认绑定阿里云主服务器的 `8090` 端口。代码推送到 `master` 后，可在控制台选择“汽车后市场 Ontology”执行发布或回滚；流水线运行自动测试、构建不可变镜像并校验 `/api/health`。
 
+Ontology 使用中央部署模式：服务器和 Tailscale 凭据只在 `CSS-Deploy-Center` 的 GitHub `production` Environment 配置一次，业务仓库不保存生产凭据。中央构建 Job 只持有可选的只读 `REPOSITORY_READ_TOKEN`，部署 Job 才能读取生产环境 Secret。
+
 GFM 通用大模型基座作为独立 GPU 服务接入，使用专用 `deploy.yml` 发布到 AutoDL，并复用服务器上的模型、Redis 和受保护运行配置。
 
 ## 当前线上入口
@@ -95,6 +97,11 @@ pnpm dev
 - Actions: Read and write
 - Contents: Read
 - Metadata: Read
+
+中央部署还需要在本仓库配置：
+
+- Repository Secret `REPOSITORY_READ_TOKEN`：仅用于读取受管的私有业务仓库；业务仓库为公开仓库时可以省略。
+- `production` Environment Secrets：`DEPLOY_HOST`、`DEPLOY_PORT`、`DEPLOY_USER`、`DEPLOY_SSH_KEY`、`DEPLOY_HOST_KEY`、`TS_OAUTH_CLIENT_ID`、`TS_OAUTH_SECRET`。
 
 ## 阿里云部署
 

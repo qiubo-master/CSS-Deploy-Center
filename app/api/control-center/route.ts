@@ -70,6 +70,11 @@ export async function GET(request: NextRequest) {
   const selectedResolved = { ...selected, endpoint: resolveHost(selectedServer?.address, selected.endpoint), healthUrl: resolveHost(selectedServer?.address, selected.healthUrl) };
   const selectedWithTargets = { ...selectedResolved, targetIds: targets.filter((target) => target.projectIds.includes(selected.id)).map((target) => target.id) };
   const [owner, repo] = selectedResolved.repository.split("/");
+  const centralRepository = process.env.DEPLOY_RUNNER_GITHUB_REPOSITORY ?? "qiubo-master/CSS-Deploy-Center";
+  const centralWorkflow = process.env.DEPLOY_RUNNER_GITHUB_WORKFLOW_FILE ?? "deploy-project.yml";
+  const runRepository = selected.centralDeployment ? centralRepository : selected.repository;
+  const runWorkflow = selected.centralDeployment ? centralWorkflow : selected.workflow;
+  const [runOwner, runRepo] = runRepository.split("/");
   const health = await checkHealth(selectedResolved.healthUrl);
   const monitoredServers = await Promise.all(targets.map(async (target) => {
     const monitor = await monitorTarget(target);
@@ -83,11 +88,14 @@ export async function GET(request: NextRequest) {
   if (process.env.GITHUB_TOKEN) {
     try {
       const [runsResponse, commitResponse] = await Promise.all([
-        fetch(`https://api.github.com/repos/${owner}/${repo}/actions/runs?per_page=20`, { headers: githubHeaders(), cache: "no-store" }),
+        fetch(`https://api.github.com/repos/${runOwner}/${runRepo}/actions/workflows/${encodeURIComponent(runWorkflow)}/runs?per_page=50`, { headers: githubHeaders(), cache: "no-store" }),
         fetch(`https://api.github.com/repos/${owner}/${repo}/commits/${selected.branch}`, { headers: githubHeaders(), cache: "no-store" }),
       ]);
       if (!runsResponse.ok) throw new Error(`GitHub Actions API ${runsResponse.status}`);
-      runs = (await runsResponse.json()).workflow_runs ?? [];
+      const receivedRuns: GitHubRun[] = (await runsResponse.json()).workflow_runs ?? [];
+      runs = selected.centralDeployment
+        ? receivedRuns.filter((run) => run.display_title?.startsWith(`${selected.id} · `))
+        : receivedRuns;
       if (commitResponse.ok) {
         const commit = await commitResponse.json();
         latestCommit = {
@@ -108,17 +116,20 @@ export async function GET(request: NextRequest) {
   let latestSteps: { name: string; status: string; conclusion: string | null; number: number }[] = [];
   if (latest && process.env.GITHUB_TOKEN) {
     try {
-      const jobsResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/actions/runs/${latest.id}/jobs?per_page=20`, { headers: githubHeaders(), cache: "no-store" });
+      const jobsResponse = await fetch(`https://api.github.com/repos/${runOwner}/${runRepo}/actions/runs/${latest.id}/jobs?per_page=20`, { headers: githubHeaders(), cache: "no-store" });
       if (jobsResponse.ok) {
         const jobs = (await jobsResponse.json()).jobs ?? [];
         latestSteps = jobs.flatMap((job: { name?: string; steps?: { name: string; status: string; conclusion: string | null; number: number }[] }) => (job.steps ?? []).map((step) => ({ ...step, name: `${job.name ?? "job"} · ${step.name}` })));
       }
     } catch { /* run list remains available */ }
   }
-  const latestSuccessfulDeploy = runs.find((run) => run.conclusion === "success" && /deploy/i.test(run.name));
+  const versionForRun = (run: GitHubRun) => selected.centralDeployment
+    ? run.display_title?.split(" · ")[2]?.slice(0, 7) ?? run.head_sha.slice(0, 7)
+    : run.head_sha.slice(0, 7);
+  const latestSuccessfulDeploy = runs.find((run) => run.conclusion === "success" && (selected.centralDeployment ? run.display_title?.startsWith(`${selected.id} · deploy · `) : /deploy/i.test(run.name)));
   const releases = runs.length ? runs.slice(0, 6).map((run, index) => ({
     id: String(run.id),
-    version: run.head_sha.slice(0, 7),
+    version: versionForRun(run),
     commit: run.display_title || run.name,
     branch: run.head_branch,
     status: index === 0 && run.conclusion === "success" ? "运行中" : run.conclusion === "success" ? "已归档" : run.conclusion || run.status,
@@ -142,16 +153,16 @@ export async function GET(request: NextRequest) {
     })),
     project: selectedWithTargets,
     servers: monitoredServers,
-    service: { ...health, version: latestSuccessfulDeploy?.head_sha.slice(0, 7) ?? (selectedResolved.id === "media" ? "待发布" : "current"), endpoint: selectedResolved.endpoint },
+    service: { ...health, version: latestSuccessfulDeploy ? versionForRun(latestSuccessfulDeploy) : (selectedResolved.id === "media" ? "待发布" : "current"), endpoint: selectedResolved.endpoint },
     version: {
       latest: latestCommit,
-      deployed: latestSuccessfulDeploy?.head_sha.slice(0, 7) ?? null,
-      updateAvailable: Boolean(latestCommit && latestSuccessfulDeploy && !latestSuccessfulDeploy.head_sha.startsWith(latestCommit.sha)),
+      deployed: latestSuccessfulDeploy ? versionForRun(latestSuccessfulDeploy) : null,
+      updateAvailable: Boolean(latestCommit && latestSuccessfulDeploy && versionForRun(latestSuccessfulDeploy) !== latestCommit.sha),
     },
     pipeline: latest ? {
       id: `run-${latest.run_number}`,
       status: latest.conclusion ?? latest.status,
-      commit: latest.head_sha.slice(0, 7),
+      commit: versionForRun(latest),
       actor: latest.actor?.login ?? "unknown",
       startedAt: new Date(latest.created_at).toLocaleString("zh-CN"),
       stages: stagesFor(latest.status, latest.conclusion),
@@ -163,13 +174,13 @@ export async function GET(request: NextRequest) {
       name: run.name,
       status: run.status,
       conclusion: run.conclusion,
-      commit: run.head_sha.slice(0, 7),
+      commit: versionForRun(run),
       branch: run.head_branch,
       event: run.event ?? "workflow_dispatch",
       actor: run.actor?.login ?? "unknown",
       createdAt: new Date(run.created_at).toLocaleString("zh-CN"),
       duration: elapsed(run.run_started_at, run.updated_at),
-      url: run.html_url ?? `https://github.com/${selected.repository}/actions/runs/${run.id}`,
+      url: run.html_url ?? `https://github.com/${runRepository}/actions/runs/${run.id}`,
     })),
     latestSteps,
     resourceProfiles: selected.resourceManaged ? [
@@ -205,9 +216,20 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: `演示模式：已模拟${demoAction}${project.name}` });
   }
 
-  const [owner, repo] = project.repository.split("/");
+  const centralRepository = process.env.DEPLOY_RUNNER_GITHUB_REPOSITORY ?? "qiubo-master/CSS-Deploy-Center";
+  const centralWorkflow = process.env.DEPLOY_RUNNER_GITHUB_WORKFLOW_FILE ?? "deploy-project.yml";
+  const centralBranch = process.env.DEPLOY_RUNNER_GITHUB_BRANCH ?? "master";
+  const dispatchRepository = project.centralDeployment ? centralRepository : project.repository;
+  const [owner, repo] = dispatchRepository.split("/");
   const workflowAction = input.action === "release" ? "deploy" : input.action;
   const workflowInputs: Record<string, string> = { action: workflowAction };
+  if (project.centralDeployment) {
+    const [projectOwner, projectRepo] = project.repository.split("/");
+    const targetResponse = await fetch(`https://api.github.com/repos/${projectOwner}/${projectRepo}/commits/${encodeURIComponent(input.branch || project.branch)}`, { headers: githubHeaders(), cache: "no-store" });
+    if (!targetResponse.ok) return NextResponse.json({ message: `无法读取目标项目版本（GitHub ${targetResponse.status}）` }, { status: 502 });
+    const targetCommit = await targetResponse.json();
+    Object.assign(workflowInputs, { project_id: project.id, repository: project.repository, target_sha: String(targetCommit.sha) });
+  }
   if (project.resourceManaged) Object.assign(workflowInputs, {
     resource_profile: profileName,
     app_cpu: profiles[profileName].cpu,
@@ -217,10 +239,10 @@ export async function POST(request: NextRequest) {
     bind_address: input.exposure === "gateway" ? "127.0.0.1" : "0.0.0.0",
   });
 
-  const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/actions/workflows/${project.workflow}/dispatches`, {
+  const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/actions/workflows/${project.centralDeployment ? centralWorkflow : project.workflow}/dispatches`, {
     method: "POST",
     headers: githubHeaders(),
-    body: JSON.stringify({ ref: input.branch || project.branch, inputs: workflowInputs }),
+    body: JSON.stringify({ ref: project.centralDeployment ? centralBranch : input.branch || project.branch, inputs: workflowInputs }),
   });
   if (!response.ok) {
     const detail = await response.text();

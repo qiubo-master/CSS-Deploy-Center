@@ -1,0 +1,148 @@
+name: Deploy Managed Project
+run-name: ${{ inputs.project_id }} · ${{ inputs.action }} · ${{ inputs.target_sha }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      project_id: { description: Registered ForgeOps project ID, required: true }
+      repository: { description: Exact owner/repository, required: true }
+      target_sha: { description: Immutable target commit SHA, required: true }
+      action: { description: Deployment action, required: true, default: deploy, type: choice, options: [deploy, rollback] }
+      resource_profile: { description: Auditable resource profile, required: true, default: standard }
+      app_cpu: { description: CPU limit, required: true, default: "2.0" }
+      app_memory: { description: Memory limit, required: true, default: "2g" }
+      database_memory: { description: Reserved resource contract, required: true, default: "1g" }
+      host_port: { description: Host port, required: true, default: "8090" }
+      bind_address: { description: Exposure address, required: true, default: "0.0.0.0" }
+
+concurrency:
+  group: managed-${{ inputs.project_id }}-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    outputs:
+      image_repository: ${{ steps.catalog.outputs.image_repository }}
+      container_port: ${{ steps.catalog.outputs.container_port }}
+      health_path: ${{ steps.catalog.outputs.health_path }}
+      deploy_root: ${{ steps.catalog.outputs.deploy_root }}
+    steps:
+      - name: Validate project and release request
+        id: catalog
+        env:
+          PROJECT_ID: ${{ inputs.project_id }}
+          REPOSITORY: ${{ inputs.repository }}
+          TARGET_SHA: ${{ inputs.target_sha }}
+          APP_CPU: ${{ inputs.app_cpu }}
+          APP_MEMORY: ${{ inputs.app_memory }}
+          HOST_PORT: ${{ inputs.host_port }}
+          BIND_ADDRESS: ${{ inputs.bind_address }}
+        run: |
+          [[ "$PROJECT_ID" =~ ^[a-z0-9][a-z0-9-]{1,39}$ ]]
+          [[ "$TARGET_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$APP_CPU" =~ ^(1\.0|2\.0|4\.0)$ ]]
+          [[ "$APP_MEMORY" =~ ^(1g|2g|4g)$ ]]
+          [[ "$HOST_PORT" =~ ^[0-9]{4,5}$ ]] && (( HOST_PORT >= 1024 && HOST_PORT <= 65535 ))
+          [[ "$BIND_ADDRESS" == "0.0.0.0" || "$BIND_ADDRESS" == "127.0.0.1" ]]
+          case "$PROJECT_ID:$REPOSITORY" in
+            ontology:qiubo-master/Ontology)
+              echo "image_repository=forgeops/ontology" >> "$GITHUB_OUTPUT"
+              echo "container_port=8000" >> "$GITHUB_OUTPUT"
+              echo "health_path=/api/health" >> "$GITHUB_OUTPUT"
+              echo "deploy_root=/opt/ontology-platform" >> "$GITHUB_OUTPUT"
+              ;;
+            *) echo "Project/repository is not allow-listed" >&2; exit 1 ;;
+          esac
+
+  build:
+    needs: validate
+    if: inputs.action == 'deploy'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out immutable project source
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.repository }}
+          ref: ${{ inputs.target_sha }}
+          token: ${{ secrets.REPOSITORY_READ_TOKEN || github.token }}
+          path: source
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Test project
+        working-directory: source
+        run: python -m unittest discover -s tests -v
+      - name: Build immutable image
+        env:
+          IMAGE_REPOSITORY: ${{ needs.validate.outputs.image_repository }}
+          TARGET_SHA: ${{ inputs.target_sha }}
+        run: |
+          docker build -t "$IMAGE_REPOSITORY:$TARGET_SHA" source
+          docker save "$IMAGE_REPOSITORY:$TARGET_SHA" | gzip -1 > managed-image.tar.gz
+      - uses: actions/upload-artifact@v4
+        with:
+          name: managed-image-${{ github.run_id }}
+          path: managed-image.tar.gz
+          retention-days: 1
+          if-no-files-found: error
+
+  deploy:
+    needs: [validate, build]
+    if: ${{ always() && needs.validate.result == 'success' && (needs.build.result == 'success' || needs.build.result == 'skipped') }}
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download immutable image
+        if: inputs.action == 'deploy'
+        uses: actions/download-artifact@v4
+        with:
+          name: managed-image-${{ github.run_id }}
+          path: /tmp/managed-release
+      - name: Connect to deployment tailnet
+        uses: tailscale/github-action@v4
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+          ping: ${{ secrets.DEPLOY_HOST }}
+      - name: Configure SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          SSH_HOST_KEY: ${{ secrets.DEPLOY_HOST_KEY }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$SSH_HOST_KEY" > ~/.ssh/known_hosts
+      - name: Upload immutable image
+        if: inputs.action == 'deploy'
+        env:
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          PORT: ${{ secrets.DEPLOY_PORT }}
+          USER: ${{ secrets.DEPLOY_USER }}
+        run: scp -i ~/.ssh/deploy_key -P "$PORT" /tmp/managed-release/managed-image.tar.gz "$USER@$HOST:/tmp/managed-image-${GITHUB_RUN_ID}.tar.gz"
+      - name: Activate and verify release
+        env:
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          PORT: ${{ secrets.DEPLOY_PORT }}
+          USER: ${{ secrets.DEPLOY_USER }}
+          ACTION: ${{ inputs.action }}
+          PROJECT_ID: ${{ inputs.project_id }}
+          RELEASE_SHA: ${{ inputs.target_sha }}
+          IMAGE_REPOSITORY: ${{ needs.validate.outputs.image_repository }}
+          CONTAINER_PORT: ${{ needs.validate.outputs.container_port }}
+          HEALTH_PATH: ${{ needs.validate.outputs.health_path }}
+          DEPLOY_ROOT: ${{ needs.validate.outputs.deploy_root }}
+          APP_CPU: ${{ inputs.app_cpu }}
+          APP_MEMORY: ${{ inputs.app_memory }}
+          HOST_PORT: ${{ inputs.host_port }}
+          BIND_ADDRESS: ${{ inputs.bind_address }}
+        run: |
+          ssh -i ~/.ssh/deploy_key -p "$PORT" "$USER@$HOST" \
+            "ACTION=$ACTION PROJECT_ID=$PROJECT_ID RELEASE_SHA=$RELEASE_SHA IMAGE_REPOSITORY=$IMAGE_REPOSITORY CONTAINER_PORT=$CONTAINER_PORT HEALTH_PATH=$HEALTH_PATH DEPLOY_ROOT=$DEPLOY_ROOT APP_CPU=$APP_CPU APP_MEMORY=$APP_MEMORY HOST_PORT=$HOST_PORT BIND_ADDRESS=$BIND_ADDRESS IMAGE_ARCHIVE=/tmp/managed-image-${GITHUB_RUN_ID}.tar.gz bash -s" \
+            < ops/deploy-managed-container.sh

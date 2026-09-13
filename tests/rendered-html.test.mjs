@@ -108,9 +108,11 @@ test("demo deployment and rollback actions are accepted", async () => {
 
 test("metadata and deployment assets are present", async () => {
   const { readFile, access } = await import("node:fs/promises");
-  const [layout, workflow, acrWorkflow, acrCatalog, dockerfile, envExample] = await Promise.all([
+  const [layout, workflow, managedWorkflow, managedScript, acrWorkflow, acrCatalog, dockerfile, envExample] = await Promise.all([
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../.github/workflows/deploy.yml", import.meta.url), "utf8"),
+    readFile(new URL("../.github/workflows/deploy-project.yml", import.meta.url), "utf8"),
+    readFile(new URL("../ops/deploy-managed-container.sh", import.meta.url), "utf8"),
     readFile(new URL("../.github/workflows/sync-acr.yml", import.meta.url), "utf8"),
     readFile(new URL("../ops/acr-images.json", import.meta.url), "utf8"),
     readFile(new URL("../Dockerfile", import.meta.url), "utf8"),
@@ -120,6 +122,11 @@ test("metadata and deployment assets are present", async () => {
   assert.match(workflow, /Deploy Control Center/);
   assert.match(workflow, /crpi-73ce4hnji7xum4zi\.cn-heyuan\.personal\.cr\.aliyuncs\.com/);
   assert.doesNotMatch(workflow, /docker save|split -b|IMAGE_ARCHIVE/);
+  assert.match(managedWorkflow, /Deploy Managed Project/);
+  assert.match(managedWorkflow, /environment: production/);
+  assert.match(managedWorkflow, /REPOSITORY_READ_TOKEN/);
+  assert.match(managedScript, /\/api\/health/);
+  assert.match(managedScript, /restoring \$PREVIOUS/);
   assert.match(acrWorkflow, /Sync repositories to Aliyun ACR/);
   assert.equal(JSON.parse(acrCatalog).images.length, 8);
   assert.match(dockerfile, /node:22-alpine/);
