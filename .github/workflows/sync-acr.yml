@@ -69,13 +69,13 @@ jobs:
           acr_password=$(printf '%s' "$ACR_PASSWORD" | tr -d '\r\n')
           echo "ACR credential lengths: username=${#acr_username}, password=${#acr_password}"
           test -n "$acr_username" && test -n "$acr_password"
-          printf '%s' "$acr_password" | docker login registry.cn-heyuan.aliyuncs.com \
+          printf '%s' "$acr_password" | docker login crpi-73ce4hnji7xum4zi.cn-heyuan.personal.cr.aliyuncs.com \
             --username "$acr_username" --password-stdin
 
       - name: Check whether commit image already exists
         id: existing
         env:
-          IMAGE: registry.cn-heyuan.aliyuncs.com/qiubo-master/${{ matrix.image }}
+          IMAGE: crpi-73ce4hnji7xum4zi.cn-heyuan.personal.cr.aliyuncs.com/qiubo-master/${{ matrix.image }}
           SHA: ${{ steps.version.outputs.sha }}
           FORCE: ${{ inputs.force || 'false' }}
         run: |
@@ -98,7 +98,7 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: |
-            registry.cn-heyuan.aliyuncs.com/qiubo-master/${{ matrix.image }}:${{ steps.version.outputs.sha }}
-            registry.cn-heyuan.aliyuncs.com/qiubo-master/${{ matrix.image }}:latest
+            crpi-73ce4hnji7xum4zi.cn-heyuan.personal.cr.aliyuncs.com/qiubo-master/${{ matrix.image }}:${{ steps.version.outputs.sha }}
+            crpi-73ce4hnji7xum4zi.cn-heyuan.personal.cr.aliyuncs.com/qiubo-master/${{ matrix.image }}:latest
           cache-from: type=gha,scope=${{ matrix.image }}
           cache-to: type=gha,mode=max,scope=${{ matrix.image }}

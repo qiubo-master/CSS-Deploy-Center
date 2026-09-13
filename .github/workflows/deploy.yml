@@ -30,13 +30,13 @@ jobs:
         env:
           ACR_USERNAME: ${{ secrets.ACR_USERNAME }}
           ACR_PASSWORD: ${{ secrets.ACR_PASSWORD }}
-          IMAGE: registry.cn-heyuan.aliyuncs.com/qiubo-master/css-deploy-center
+          IMAGE: crpi-73ce4hnji7xum4zi.cn-heyuan.personal.cr.aliyuncs.com/qiubo-master/css-deploy-center
         run: |
           acr_username=$(printf '%s' "$ACR_USERNAME" | tr -d '\r\n')
           acr_password=$(printf '%s' "$ACR_PASSWORD" | tr -d '\r\n')
           echo "ACR credential lengths: username=${#acr_username}, password=${#acr_password}"
           test -n "$acr_username" && test -n "$acr_password"
-          printf '%s' "$acr_password" | docker login registry.cn-heyuan.aliyuncs.com \
+          printf '%s' "$acr_password" | docker login crpi-73ce4hnji7xum4zi.cn-heyuan.personal.cr.aliyuncs.com \
             --username "$acr_username" --password-stdin
           docker build -t "$IMAGE:${GITHUB_SHA}" -t "$IMAGE:latest" .
           docker push "$IMAGE:${GITHUB_SHA}"
@@ -115,9 +115,9 @@ jobs:
         run: |
           printf -v remote_acr_user '%q' "$ACR_USERNAME"
           printf '%s' "$ACR_PASSWORD" | ssh -i ~/.ssh/deploy_key -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=20 -p "$PORT" "$USER@$HOST" \
-            "docker login registry.cn-heyuan.aliyuncs.com -u $remote_acr_user --password-stdin"
+            "docker login crpi-73ce4hnji7xum4zi.cn-heyuan.personal.cr.aliyuncs.com -u $remote_acr_user --password-stdin"
           ssh -i ~/.ssh/deploy_key -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=20 -p "$PORT" "$USER@$HOST" \
-            "RELEASE_SHA=$GITHUB_SHA ARCHIVE=/tmp/control-center-${GITHUB_SHA}.tgz IMAGE_REF=registry.cn-heyuan.aliyuncs.com/qiubo-master/css-deploy-center:$GITHUB_SHA bash -s" \
+            "RELEASE_SHA=$GITHUB_SHA ARCHIVE=/tmp/control-center-${GITHUB_SHA}.tgz IMAGE_REF=crpi-73ce4hnji7xum4zi.cn-heyuan.personal.cr.aliyuncs.com/qiubo-master/css-deploy-center:$GITHUB_SHA bash -s" \
             < ops/deploy-control-center.sh
       - name: Roll back release
         if: github.event_name == 'workflow_dispatch' && inputs.action == 'rollback'

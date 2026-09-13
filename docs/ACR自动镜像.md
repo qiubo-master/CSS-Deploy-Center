@@ -9,7 +9,7 @@
 - `<commit-sha>`：不可变发布版本，用于部署与回滚。
 - `latest`：最新成功构建版本，用于人工查看和测试。
 
-目标 Registry 为 `registry.cn-heyuan.aliyuncs.com`，命名空间为 `qiubo-master`。ACR 命名空间应开启“自动创建仓库”，新镜像仓库默认设为私有。
+目标 Registry 为 `crpi-73ce4hnji7xum4zi.cn-heyuan.personal.cr.aliyuncs.com`，命名空间为 `qiubo-master`。ACR 命名空间应开启“自动创建仓库”，新镜像仓库默认设为私有。
 
 ## GitHub 配置
 
