@@ -14,7 +14,44 @@ permissions:
   contents: read
 
 jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    environment: production
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - source: otel/opentelemetry-collector-contrib:0.123.0
+            target: otel-collector-contrib:0.123.0
+          - source: prom/prometheus:v3.2.1
+            target: prometheus:v3.2.1
+          - source: grafana/tempo:2.7.2
+            target: tempo:2.7.2
+          - source: docker.elastic.co/elasticsearch/elasticsearch:8.17.3
+            target: elasticsearch:8.17.3
+          - source: grafana/grafana:11.6.0
+            target: grafana:11.6.0
+    steps:
+      - name: Log in to Aliyun ACR
+        env:
+          ACR_USERNAME: ${{ secrets.ACR_USERNAME }}
+          ACR_PASSWORD: ${{ secrets.ACR_PASSWORD }}
+        run: printf '%s' "$ACR_PASSWORD" | docker login crpi-73ce4hnji7xum4zi.cn-heyuan.personal.cr.aliyuncs.com --username "$ACR_USERNAME" --password-stdin
+      - name: Mirror immutable dependency image
+        env:
+          SOURCE_IMAGE: ${{ matrix.source }}
+          TARGET_IMAGE: crpi-73ce4hnji7xum4zi.cn-heyuan.personal.cr.aliyuncs.com/qiubo-master/${{ matrix.target }}
+        run: |
+          if docker manifest inspect "$TARGET_IMAGE" >/dev/null 2>&1; then
+            echo "ACR image already exists"
+          else
+            docker pull "$SOURCE_IMAGE"
+            docker tag "$SOURCE_IMAGE" "$TARGET_IMAGE"
+            docker push "$TARGET_IMAGE"
+          fi
+
   deploy:
+    needs: mirror
     runs-on: ubuntu-latest
     environment: production
     steps:
@@ -66,7 +103,11 @@ jobs:
           PORT: ${{ secrets.DEPLOY_PORT }}
           USER: ${{ secrets.DEPLOY_USER }}
           TARGET_SHA: ${{ inputs.target_sha }}
+          ACR_USERNAME: ${{ secrets.ACR_USERNAME }}
+          ACR_PASSWORD: ${{ secrets.ACR_PASSWORD }}
         run: |
+          printf '%s' "$ACR_PASSWORD" | ssh -i ~/.ssh/deploy_key -p "$PORT" "$USER@$HOST" \
+            "docker login crpi-73ce4hnji7xum4zi.cn-heyuan.personal.cr.aliyuncs.com --username '$ACR_USERNAME' --password-stdin"
           ssh -i ~/.ssh/deploy_key -p "$PORT" "$USER@$HOST" "TARGET_SHA=$TARGET_SHA bash -s" <<'REMOTE'
           set -euo pipefail
           root=/opt/css-deploy-center/managed/otel

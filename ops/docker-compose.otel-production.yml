@@ -2,7 +2,7 @@ name: otel-platform
 
 services:
   otel-collector:
-    image: otel/opentelemetry-collector-contrib:${OTEL_COLLECTOR_VERSION:-0.123.0}
+    image: crpi-73ce4hnji7xum4zi.cn-heyuan.personal.cr.aliyuncs.com/qiubo-master/otel-collector-contrib:${OTEL_COLLECTOR_VERSION:-0.123.0}
     command: ["--config=/etc/otelcol-contrib/config.yaml"]
     volumes:
       - ./config/otel-collector.yaml:/etc/otelcol-contrib/config.yaml:ro
@@ -13,7 +13,7 @@ services:
     networks: [observability]
 
   prometheus:
-    image: prom/prometheus:${PROMETHEUS_VERSION:-v3.2.1}
+    image: crpi-73ce4hnji7xum4zi.cn-heyuan.personal.cr.aliyuncs.com/qiubo-master/prometheus:${PROMETHEUS_VERSION:-v3.2.1}
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.path=/prometheus
@@ -29,7 +29,7 @@ services:
     networks: [observability]
 
   tempo:
-    image: grafana/tempo:${TEMPO_VERSION:-2.7.2}
+    image: crpi-73ce4hnji7xum4zi.cn-heyuan.personal.cr.aliyuncs.com/qiubo-master/tempo:${TEMPO_VERSION:-2.7.2}
     command: ["-config.file=/etc/tempo.yaml"]
     volumes:
       - ./config/tempo.yaml:/etc/tempo.yaml:ro
@@ -38,7 +38,7 @@ services:
     networks: [observability]
 
   elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:${ELASTIC_VERSION:-8.17.3}
+    image: crpi-73ce4hnji7xum4zi.cn-heyuan.personal.cr.aliyuncs.com/qiubo-master/elasticsearch:${ELASTIC_VERSION:-8.17.3}
     environment:
       discovery.type: single-node
       xpack.security.enabled: "false"
@@ -55,7 +55,7 @@ services:
     networks: [observability]
 
   grafana:
-    image: grafana/grafana:${GRAFANA_VERSION:-11.6.0}
+    image: crpi-73ce4hnji7xum4zi.cn-heyuan.personal.cr.aliyuncs.com/qiubo-master/grafana:${GRAFANA_VERSION:-11.6.0}
     environment:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?required}
