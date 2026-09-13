@@ -26,7 +26,7 @@ jobs:
           - { source: "postgres:16", target: "postgres:16" }
           - { source: "clickhouse/clickhouse-server:24", target: "clickhouse-server:24" }
           - { source: "redis:7", target: "redis:7" }
-          - { source: "minio/minio:latest", target: "minio:latest" }
+          - { source: "quay.io/minio/minio:latest", target: "minio:latest" }
     steps:
       - name: Log in to Aliyun ACR
         env:
