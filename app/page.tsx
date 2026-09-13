@@ -26,7 +26,7 @@ const seed: Dashboard = {
   mode: "demo",
   projects: [
     { id: "ontology", name: "汽车后市场 Ontology", repository: "qiubo-master/Ontology", branch: "master", description: "智能客服意图、对象、规则、能力与决策链路运行平台", endpoint: "http://100.103.132.88:8090", resourceManaged: true, targetIds: ["aliyun-main"] },
-    { id: "css", name: "智能客服", repository: "qiubo-master/CSS", branch: "master", description: "汽车后市场智能客服与轮胎业务服务", projectUrl: "https://github.com/qiubo-master/CSS", endpoint: "尚未配置线上访问地址", resourceManaged: false, targetIds: ["aliyun-main"] },
+    { id: "css", name: "智能客服", repository: "qiubo-master/CSS", branch: "master", description: "汽车后市场智能客服与轮胎业务服务", projectUrl: "http://100.103.132.88:8100", endpoint: "http://100.103.132.88:8100", resourceManaged: true, targetIds: ["aliyun-main"] },
     { id: "ai-ops", name: "AI运营", repository: "qiubo-master/AI_OPS", branch: "master", description: "门店运营、巡检与业务编排智能平台", projectUrl: "http://100.103.132.88:8101", endpoint: "http://100.103.132.88:8101", resourceManaged: true, targetIds: ["aliyun-main"] },
     { id: "ai-wms", name: "AI供应链", repository: "qiubo-master/AI_WMS", branch: "master", description: "供应链智能备货与仓储决策平台", projectUrl: "http://100.103.132.88:8102", endpoint: "http://100.103.132.88:8102", resourceManaged: true, targetIds: ["aliyun-main"] },
     { id: "media", name: "序章自媒体中台", repository: "qiubo-master/Media", branch: "master", description: "内容生产、账号矩阵与 AI 决策中台", endpoint: "http://100.103.132.88:8080", resourceManaged: true, targetIds: ["aliyun-main"] },
