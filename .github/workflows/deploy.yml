@@ -25,36 +25,6 @@ jobs:
     environment: production
     steps:
       - uses: actions/checkout@v4
-      - name: Log in to Aliyun ACR
-        if: github.event_name != 'workflow_dispatch' || inputs.action == 'deploy'
-        env:
-          ACR_USERNAME: ${{ secrets.ACR_USERNAME }}
-          ACR_PASSWORD: ${{ secrets.ACR_PASSWORD }}
-        run: |
-          acr_username=$(printf '%s' "$ACR_USERNAME" | tr -d '\r\n')
-          acr_password=$(printf '%s' "$ACR_PASSWORD" | tr -d '\r\n')
-          echo "ACR credential lengths: username=${#acr_username}, password=${#acr_password}"
-          test -n "$acr_username" && test -n "$acr_password"
-          printf '%s' "$acr_password" | docker login crpi-73ce4hnji7xum4zi.cn-heyuan.personal.cr.aliyuncs.com \
-            --username "$acr_username" --password-stdin
-
-      - uses: docker/setup-buildx-action@v3
-        if: github.event_name != 'workflow_dispatch' || inputs.action == 'deploy'
-
-      - name: Build and push deployment image
-        if: github.event_name != 'workflow_dispatch' || inputs.action == 'deploy'
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          platforms: linux/amd64
-          push: true
-          provenance: false
-          sbom: false
-          tags: |
-            crpi-73ce4hnji7xum4zi.cn-heyuan.personal.cr.aliyuncs.com/qiubo-master/css-deploy-center:${{ github.sha }}
-            crpi-73ce4hnji7xum4zi.cn-heyuan.personal.cr.aliyuncs.com/qiubo-master/css-deploy-center:latest
-          cache-from: type=gha,scope=css-deploy-center
-          cache-to: type=gha,mode=max,scope=css-deploy-center
       - name: Connect to deployment tailnet
         uses: tailscale/github-action@v4
         with:
@@ -124,14 +94,9 @@ jobs:
           HOST: ${{ secrets.DEPLOY_HOST }}
           PORT: ${{ secrets.DEPLOY_PORT }}
           USER: ${{ secrets.DEPLOY_USER }}
-          ACR_USERNAME: ${{ secrets.ACR_USERNAME }}
-          ACR_PASSWORD: ${{ secrets.ACR_PASSWORD }}
         run: |
-          printf -v remote_acr_user '%q' "$ACR_USERNAME"
-          printf '%s' "$ACR_PASSWORD" | ssh -i ~/.ssh/deploy_key -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=20 -p "$PORT" "$USER@$HOST" \
-            "docker login crpi-73ce4hnji7xum4zi.cn-heyuan.personal.cr.aliyuncs.com -u $remote_acr_user --password-stdin"
           ssh -i ~/.ssh/deploy_key -o ConnectTimeout=20 -o ServerAliveInterval=15 -o ServerAliveCountMax=20 -p "$PORT" "$USER@$HOST" \
-            "RELEASE_SHA=$GITHUB_SHA ARCHIVE=/tmp/control-center-${GITHUB_SHA}.tgz IMAGE_REF=crpi-73ce4hnji7xum4zi.cn-heyuan.personal.cr.aliyuncs.com/qiubo-master/css-deploy-center:$GITHUB_SHA bash -s" \
+            "RELEASE_SHA=$GITHUB_SHA ARCHIVE=/tmp/control-center-${GITHUB_SHA}.tgz bash -s" \
             < ops/deploy-control-center.sh
       - name: Roll back release
         if: github.event_name == 'workflow_dispatch' && inputs.action == 'rollback'

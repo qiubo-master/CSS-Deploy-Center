@@ -1,0 +1,17 @@
+ARG BASE_IMAGE=css-deploy-center:1.0.0
+FROM ${BASE_IMAGE}
+
+WORKDIR /app
+
+# Reuse the installed dependency tree from the current production image while
+# removing stale application files that no longer exist in the new release.
+RUN mv /app/node_modules /tmp/control-center-node_modules \
+  && find /app -mindepth 1 -maxdepth 1 -exec rm -rf {} + \
+  && mv /tmp/control-center-node_modules /app/node_modules
+
+COPY . .
+RUN pnpm install --frozen-lockfile && pnpm build
+
+ENV NODE_ENV=production PORT=3000
+EXPOSE 3000
+CMD ["pnpm", "start"]

@@ -120,7 +120,8 @@ test("metadata and deployment assets are present", async () => {
   ]);
   assert.match(layout, /ForgeOps/);
   assert.match(workflow, /Deploy Control Center/);
-  assert.match(workflow, /crpi-73ce4hnji7xum4zi\.cn-heyuan\.personal\.cr\.aliyuncs\.com/);
+  assert.match(workflow, /control-center-\$\{GITHUB_SHA\}\.tgz/);
+  assert.doesNotMatch(workflow, /docker\/build-push-action|docker login/);
   assert.doesNotMatch(workflow, /docker save|split -b|IMAGE_ARCHIVE/);
   assert.match(managedWorkflow, /Deploy Managed Project/);
   assert.match(managedWorkflow, /environment: production/);
