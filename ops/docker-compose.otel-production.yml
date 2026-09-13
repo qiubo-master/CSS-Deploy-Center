@@ -1,0 +1,82 @@
+name: otel-platform
+
+services:
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:${OTEL_COLLECTOR_VERSION:-0.123.0}
+    command: ["--config=/etc/otelcol-contrib/config.yaml"]
+    volumes:
+      - ./config/otel-collector.yaml:/etc/otelcol-contrib/config.yaml:ro
+    depends_on:
+      tempo: { condition: service_started }
+      elasticsearch: { condition: service_healthy }
+    restart: unless-stopped
+    networks: [observability]
+
+  prometheus:
+    image: prom/prometheus:${PROMETHEUS_VERSION:-v3.2.1}
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=30d
+      - --web.enable-lifecycle
+      - --web.enable-remote-write-receiver
+    volumes:
+      - ./config/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./config/prometheus/rules:/etc/prometheus/rules:ro
+      - prometheus-data:/prometheus
+    depends_on: [otel-collector]
+    restart: unless-stopped
+    networks: [observability]
+
+  tempo:
+    image: grafana/tempo:${TEMPO_VERSION:-2.7.2}
+    command: ["-config.file=/etc/tempo.yaml"]
+    volumes:
+      - ./config/tempo.yaml:/etc/tempo.yaml:ro
+      - tempo-data:/var/tempo
+    restart: unless-stopped
+    networks: [observability]
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:${ELASTIC_VERSION:-8.17.3}
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      xpack.license.self_generated.type: basic
+      ES_JAVA_OPTS: -Xms1g -Xmx1g
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9200/_cluster/health >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+    networks: [observability]
+
+  grafana:
+    image: grafana/grafana:${GRAFANA_VERSION:-11.6.0}
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?required}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_FEATURE_TOGGLES_ENABLE: traceToMetrics
+    volumes:
+      - ./config/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./config/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "${BIND_ADDRESS:-0.0.0.0}:${GRAFANA_PORT:-8103}:3000"
+    depends_on: [prometheus, tempo, elasticsearch]
+    restart: unless-stopped
+    networks: [observability]
+
+volumes:
+  prometheus-data:
+  tempo-data:
+  elasticsearch-data:
+  grafana-data:
+
+networks:
+  observability:
+    driver: bridge

@@ -29,8 +29,14 @@ jobs:
           ref: ${{ inputs.target_sha }}
           token: ${{ secrets.REPOSITORY_READ_TOKEN || github.token }}
           path: source
+      - name: Check out production deployment policy
+        uses: actions/checkout@v4
+        with:
+          path: deploy-center
       - name: Package configuration
-        run: tar -C source --exclude=.git -czf /tmp/otel-platform.tgz .
+        run: |
+          cp deploy-center/ops/docker-compose.otel-production.yml source/docker-compose.yml
+          tar -C source --exclude=.git -czf /tmp/otel-platform.tgz .
       - name: Connect to deployment tailnet
         uses: tailscale/github-action@v4
         with:
