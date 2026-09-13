@@ -166,5 +166,7 @@ jobs:
           BIND_ADDRESS: ${{ inputs.bind_address }}
         run: |
           ssh -i ~/.ssh/deploy_key -p "$PORT" "$USER@$HOST" \
+            "sudo -n install -d -o '$USER' -g '$USER' '$DEPLOY_ROOT' '$DEPLOY_ROOT/releases' '$DEPLOY_ROOT/shared'"
+          ssh -i ~/.ssh/deploy_key -p "$PORT" "$USER@$HOST" \
             "ACTION=$ACTION PROJECT_ID=$PROJECT_ID RELEASE_SHA=$RELEASE_SHA IMAGE_REPOSITORY=$IMAGE_REPOSITORY CONTAINER_PORT=$CONTAINER_PORT HEALTH_PATH=$HEALTH_PATH DEPLOY_ROOT=$DEPLOY_ROOT APP_CPU=$APP_CPU APP_MEMORY=$APP_MEMORY HOST_PORT=$HOST_PORT BIND_ADDRESS=$BIND_ADDRESS bash -s" \
             < ops/deploy-managed-container.sh
