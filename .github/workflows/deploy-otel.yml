@@ -1,0 +1,90 @@
+name: Deploy Otel Platform
+run-name: otel · deploy · ${{ inputs.target_sha }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_sha: { description: Immutable Otel commit SHA, required: true, default: "4273a2864732fd91da793ed9666ed245c9f7e64d" }
+
+concurrency:
+  group: otel-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Validate release
+        env:
+          TARGET_SHA: ${{ inputs.target_sha }}
+        run: '[[ "$TARGET_SHA" =~ ^[0-9a-f]{40}$ ]]'
+      - name: Check out immutable Otel source
+        uses: actions/checkout@v4
+        with:
+          repository: qiubo-master/Otel
+          ref: ${{ inputs.target_sha }}
+          token: ${{ secrets.REPOSITORY_READ_TOKEN || github.token }}
+          path: source
+      - name: Package configuration
+        run: tar -C source --exclude=.git -czf /tmp/otel-platform.tgz .
+      - name: Connect to deployment tailnet
+        uses: tailscale/github-action@v4
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+          ping: ${{ secrets.DEPLOY_HOST }}
+      - name: Configure SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          SSH_HOST_KEY: ${{ secrets.DEPLOY_HOST_KEY_CURRENT || secrets.DEPLOY_HOST_KEY }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$SSH_HOST_KEY" > ~/.ssh/known_hosts
+      - name: Upload release configuration
+        env:
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          PORT: ${{ secrets.DEPLOY_PORT }}
+          USER: ${{ secrets.DEPLOY_USER }}
+          TARGET_SHA: ${{ inputs.target_sha }}
+        run: scp -i ~/.ssh/deploy_key -P "$PORT" /tmp/otel-platform.tgz "$USER@$HOST:/tmp/otel-platform-$TARGET_SHA.tgz"
+      - name: Activate and verify Otel
+        env:
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          PORT: ${{ secrets.DEPLOY_PORT }}
+          USER: ${{ secrets.DEPLOY_USER }}
+          TARGET_SHA: ${{ inputs.target_sha }}
+        run: |
+          ssh -i ~/.ssh/deploy_key -p "$PORT" "$USER@$HOST" "TARGET_SHA=$TARGET_SHA bash -s" <<'REMOTE'
+          set -euo pipefail
+          root=/opt/css-deploy-center/managed/otel
+          release="$root/releases/$TARGET_SHA"
+          mkdir -p "$release" "$root/shared"
+          tar -xzf "/tmp/otel-platform-$TARGET_SHA.tgz" -C "$release"
+          rm -f "/tmp/otel-platform-$TARGET_SHA.tgz"
+          if [[ ! -s "$root/shared/.env" ]]; then
+            umask 077
+            password=$(openssl rand -hex 32)
+            printf 'GRAFANA_ADMIN_USER=admin\nGRAFANA_ADMIN_PASSWORD=%s\nGRAFANA_PORT=8103\nBIND_ADDRESS=0.0.0.0\n' "$password" > "$root/shared/.env"
+          fi
+          chmod 600 "$root/shared/.env"
+          docker compose --env-file "$root/shared/.env" -f "$release/docker-compose.yml" pull
+          docker compose --env-file "$root/shared/.env" -f "$release/docker-compose.yml" up -d --remove-orphans
+          for attempt in $(seq 1 90); do
+            if curl -fsS http://127.0.0.1:8103/api/health >/dev/null; then
+              ln -sfn "$release" "$root/current"
+              find "$root/releases" -mindepth 1 -maxdepth 1 -type d -printf '%T@ %p\n' | sort -nr | tail -n +4 | cut -d' ' -f2- | xargs -r rm -rf
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose --env-file "$root/shared/.env" -f "$release/docker-compose.yml" ps
+          docker compose --env-file "$root/shared/.env" -f "$release/docker-compose.yml" logs --tail=80 grafana
+          exit 1
+          REMOTE
