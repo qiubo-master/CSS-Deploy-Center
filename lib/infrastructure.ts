@@ -55,7 +55,7 @@ const defaultTargets: ServerTarget[] = [{
   address: process.env.PRIMARY_SERVER_ADDRESS ?? "100.103.132.88",
   monitorUrl: process.env.ALIYUN_MONITOR_URL ?? "http://host.docker.internal:9108/v1/resources",
   monitorToken: process.env.MONITOR_AGENT_TOKEN,
-  projectIds: ["css", "media", "otel", "deploy-center"],
+  projectIds: ["css", "ontology", "media", "otel", "deploy-center"],
 }];
 
 function withBuiltInBindings(targets: ServerTarget[]) {
@@ -64,7 +64,7 @@ function withBuiltInBindings(targets: ServerTarget[]) {
   const main = {
     ...storedMain,
     ...defaultTargets[0],
-    projectIds: [...new Set([...(storedMain?.projectIds ?? defaultTargets[0].projectIds), "otel", "deploy-center"])]
+    projectIds: [...new Set([...(storedMain?.projectIds ?? defaultTargets[0].projectIds), "ontology", "otel", "deploy-center"])]
       .filter((id) => id !== "ai-wms" && id !== "ai-ops"),
   };
   return [main, ...targets.filter((target) => target.id !== "aliyun-main" && !retired(target)).map((target) => ({

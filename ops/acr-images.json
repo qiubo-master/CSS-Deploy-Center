@@ -6,6 +6,7 @@
     { "repository": "gateway", "branch": "master", "context": ".", "dockerfile": "Dockerfile", "image": "gateway" },
     { "repository": "GFM", "branch": "main", "context": ".", "dockerfile": "Dockerfile", "image": "gfm" },
     { "repository": "Media", "branch": "master", "context": ".", "dockerfile": "Dockerfile", "image": "media" },
+    { "repository": "Ontology", "branch": "master", "context": ".", "dockerfile": "Dockerfile", "image": "ontology" },
     { "repository": "WordGame", "branch": "master", "context": "server", "dockerfile": "server/Dockerfile", "image": "wordgame-server" }
   ]
 }

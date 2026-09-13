@@ -2,7 +2,9 @@
 
 完整的服务器接入、仓库配置、资源下发、流水线发布和故障处理步骤请查看 [ForgeOps CI/CD 中台操作手册](docs/操作手册.md)。新服务器的私网发布配置请查看 [Tailscale 私网发布配置手册](docs/Tailscale私网发布配置手册.md)。
 
-面向 `qiubo-master/CSS` 与 `qiubo-master/Media` 的可视化发布工作台。它通过 GitHub Actions API 触发部署和回滚，并为 Media 下发 CPU、内存、数据库内存、公网端口和暴露模式。
+面向 `qiubo-master/CSS`、`qiubo-master/Ontology` 与 `qiubo-master/Media` 等项目的可视化发布工作台。它通过 GitHub Actions API 触发部署和回滚，并为资源托管项目下发 CPU、内存、公网端口和暴露模式。
+
+Ontology 已作为内置项目接入，默认绑定阿里云主服务器的 `8090` 端口。代码推送到 `master` 后，可在控制台选择“汽车后市场 Ontology”执行发布或回滚；流水线运行自动测试、构建不可变镜像并校验 `/api/health`。
 
 GFM 通用大模型基座作为独立 GPU 服务接入，使用专用 `deploy.yml` 发布到 AutoDL，并复用服务器上的模型、Redis 和受保护运行配置。
 

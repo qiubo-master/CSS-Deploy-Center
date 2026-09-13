@@ -195,8 +195,8 @@ export async function POST(request: NextRequest) {
     large: { cpu: "4.0", memory: "4g", database_memory: "2g" },
   } as const;
   const profileName = input.resourceProfile in profiles ? input.resourceProfile as keyof typeof profiles : "standard";
-  const port = Number(input.hostPort ?? 8080);
-  if (project.id === "media" && (!Number.isInteger(port) || port < 1024 || port > 65535)) {
+  const port = Number(input.hostPort ?? project.defaultPort ?? 8080);
+  if (project.resourceManaged && (!Number.isInteger(port) || port < 1024 || port > 65535)) {
     return NextResponse.json({ message: "服务端口必须在 1024–65535 之间" }, { status: 400 });
   }
 

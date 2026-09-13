@@ -26,6 +26,7 @@ const seed: Dashboard = {
   mode: "demo",
   projects: [
     { id: "css", name: "智能客服", repository: "qiubo-master/CSS", branch: "main", description: "现有智能客服生产服务", endpoint: "等待配置", resourceManaged: false, targetIds: ["aliyun-main"] },
+    { id: "ontology", name: "汽车后市场 Ontology", repository: "qiubo-master/Ontology", branch: "master", description: "智能客服意图、对象、规则、能力与决策链路运行平台", endpoint: "http://100.103.132.88:8090", resourceManaged: true, targetIds: ["aliyun-main"] },
     { id: "media", name: "序章自媒体中台", repository: "qiubo-master/Media", branch: "main", description: "内容生产、账号矩阵与 AI 决策中台", endpoint: "http://47.113.191.114:8080", resourceManaged: true, targetIds: ["aliyun-main"] },
     { id: "word-game", name: "WordGame 单词闯关", repository: "qiubo-master/WordGame", branch: "master", description: "支持账号、闯关和进度存档的单词学习游戏", manualUrl: "https://github.com/qiubo-master/WordGame/blob/master/deploy-cloudbase.md", endpoint: "https://wordgame-1-d7gx6qvym115a8f41.tcloudbase.com", resourceManaged: false, targetIds: [] },
     { id: "gfm", name: "GFM 通用大模型基座", repository: "qiubo-master/GFM", branch: "master", description: "统一提供文本、Embedding、视觉检测、OCR 与多模态 API", endpoint: "等待配置访问地址", resourceManaged: false, targetIds: ["autodl2"] },
@@ -42,7 +43,7 @@ const seed: Dashboard = {
     { id: "standard", name: "标准", cpu: "2.0", memory: "2g", databaseMemory: "1g", note: "推荐生产配置" },
     { id: "large", name: "增强", cpu: "4.0", memory: "4g", databaseMemory: "2g", note: "高并发内容生产" },
   ],
-  servers: [{ id: "aliyun-main", name: "新生产服务器", provider: "阿里云", kind: "cloud", region: "Tailscale 私网", address: "100.103.132.88", projectIds: ["css", "media", "otel", "deploy-center"], status: "unconfigured", snapshot: null, capacity: { eligible: false, level: "unknown", reason: "监控代理未接入，无法安全下发" } }],
+  servers: [{ id: "aliyun-main", name: "新生产服务器", provider: "阿里云", kind: "cloud", region: "Tailscale 私网", address: "100.103.132.88", projectIds: ["css", "ontology", "media", "otel", "deploy-center"], status: "unconfigured", snapshot: null, capacity: { eligible: false, level: "unknown", reason: "监控代理未接入，无法安全下发" } }],
 };
 
 function stateOf(run: Pipeline) {
