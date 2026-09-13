@@ -126,6 +126,9 @@ test("metadata and deployment assets are present", async () => {
   assert.match(managedWorkflow, /Deploy Managed Project/);
   assert.match(managedWorkflow, /environment: production/);
   assert.match(managedWorkflow, /REPOSITORY_READ_TOKEN/);
+  assert.match(managedWorkflow, /docker push/);
+  assert.match(managedWorkflow, /docker pull/);
+  assert.doesNotMatch(managedWorkflow, /\bscp\b/);
   assert.match(managedScript, /\/api\/health/);
   assert.match(managedScript, /restoring \$PREVIOUS/);
   assert.match(acrWorkflow, /Sync repositories to Aliyun ACR/);

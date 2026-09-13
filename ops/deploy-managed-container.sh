@@ -12,7 +12,7 @@ validate() {
   [[ "$BIND_ADDRESS" == "0.0.0.0" || "$BIND_ADDRESS" == "127.0.0.1" ]]
   case "$PROJECT_ID" in
     ontology)
-      [[ "$IMAGE_REPOSITORY" == "forgeops/ontology" ]]
+      [[ "$IMAGE_REPOSITORY" == "crpi-73ce4hnji7xum4zi.cn-heyuan.personal.cr.aliyuncs.com/qiubo-master/ontology" ]]
       [[ "$CONTAINER_PORT" == "8000" ]]
       [[ "$HEALTH_PATH" == "/api/health" ]]
       [[ "$DEPLOY_ROOT" == "/opt/ontology-platform" ]]
@@ -60,9 +60,7 @@ if [[ "$ACTION" == "rollback" ]]; then
   TARGET="$(find "$DEPLOY_ROOT/releases" -mindepth 1 -maxdepth 1 -type d ! -path "$PREVIOUS" -printf '%T@ %p\n' | sort -nr | head -n 1 | cut -d' ' -f2-)"
   test -n "$TARGET"
 else
-  test -s "$IMAGE_ARCHIVE"
-  docker load -i "$IMAGE_ARCHIVE"
-  rm -f "$IMAGE_ARCHIVE"
+  docker image inspect "$IMAGE_REPOSITORY:$RELEASE_SHA" >/dev/null
   TARGET="$DEPLOY_ROOT/releases/$RELEASE_SHA"
   mkdir -p "$TARGET"
   cat > "$TARGET/deploy.env" <<EOF
@@ -97,4 +95,3 @@ if [[ -n "$PREVIOUS" && -s "$PREVIOUS/deploy.env" ]]; then
 fi
 echo "$PROJECT_ID health check failed" >&2
 exit 1
-

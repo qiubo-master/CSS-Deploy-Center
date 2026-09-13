@@ -50,7 +50,7 @@ jobs:
           [[ "$BIND_ADDRESS" == "0.0.0.0" || "$BIND_ADDRESS" == "127.0.0.1" ]]
           case "$PROJECT_ID:$REPOSITORY" in
             ontology:qiubo-master/Ontology)
-              echo "image_repository=forgeops/ontology" >> "$GITHUB_OUTPUT"
+              echo "image_repository=crpi-73ce4hnji7xum4zi.cn-heyuan.personal.cr.aliyuncs.com/qiubo-master/ontology" >> "$GITHUB_OUTPUT"
               echo "container_port=8000" >> "$GITHUB_OUTPUT"
               echo "health_path=/api/health" >> "$GITHUB_OUTPUT"
               echo "deploy_root=/opt/ontology-platform" >> "$GITHUB_OUTPUT"
@@ -90,19 +90,35 @@ jobs:
           retention-days: 1
           if-no-files-found: error
 
-  deploy:
+  publish:
     needs: [validate, build]
-    if: ${{ always() && needs.validate.result == 'success' && (needs.build.result == 'success' || needs.build.result == 'skipped') }}
+    if: inputs.action == 'deploy'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: managed-image-${{ github.run_id }}
+      - name: Load immutable image
+        run: docker load -i managed-image.tar.gz
+      - name: Log in to Aliyun ACR
+        env:
+          ACR_USERNAME: ${{ secrets.ACR_USERNAME }}
+          ACR_PASSWORD: ${{ secrets.ACR_PASSWORD }}
+        run: printf '%s' "$ACR_PASSWORD" | docker login crpi-73ce4hnji7xum4zi.cn-heyuan.personal.cr.aliyuncs.com --username "$ACR_USERNAME" --password-stdin
+      - name: Push immutable image
+        env:
+          IMAGE_REPOSITORY: ${{ needs.validate.outputs.image_repository }}
+          TARGET_SHA: ${{ inputs.target_sha }}
+        run: docker push "$IMAGE_REPOSITORY:$TARGET_SHA"
+
+  deploy:
+    needs: [validate, build, publish]
+    if: ${{ always() && needs.validate.result == 'success' && (needs.build.result == 'success' || needs.build.result == 'skipped') && (needs.publish.result == 'success' || needs.publish.result == 'skipped') }}
     runs-on: ubuntu-latest
     environment: production
     steps:
       - uses: actions/checkout@v4
-      - name: Download immutable image
-        if: inputs.action == 'deploy'
-        uses: actions/download-artifact@v4
-        with:
-          name: managed-image-${{ github.run_id }}
-          path: /tmp/managed-release
       - name: Connect to deployment tailnet
         uses: tailscale/github-action@v4
         with:
@@ -119,13 +135,19 @@ jobs:
           printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           printf '%s\n' "$SSH_HOST_KEY" > ~/.ssh/known_hosts
-      - name: Upload immutable image
+      - name: Pull immutable image on target
         if: inputs.action == 'deploy'
         env:
           HOST: ${{ secrets.DEPLOY_HOST }}
           PORT: ${{ secrets.DEPLOY_PORT }}
           USER: ${{ secrets.DEPLOY_USER }}
-        run: scp -i ~/.ssh/deploy_key -P "$PORT" /tmp/managed-release/managed-image.tar.gz "$USER@$HOST:/tmp/managed-image-${GITHUB_RUN_ID}.tar.gz"
+          ACR_USERNAME: ${{ secrets.ACR_USERNAME }}
+          ACR_PASSWORD: ${{ secrets.ACR_PASSWORD }}
+          IMAGE_REPOSITORY: ${{ needs.validate.outputs.image_repository }}
+          TARGET_SHA: ${{ inputs.target_sha }}
+        run: |
+          printf '%s' "$ACR_PASSWORD" | ssh -i ~/.ssh/deploy_key -o ConnectTimeout=20 -o ServerAliveInterval=15 -p "$PORT" "$USER@$HOST" \
+            "docker login crpi-73ce4hnji7xum4zi.cn-heyuan.personal.cr.aliyuncs.com --username '$ACR_USERNAME' --password-stdin && docker pull '$IMAGE_REPOSITORY:$TARGET_SHA'"
       - name: Activate and verify release
         env:
           HOST: ${{ secrets.DEPLOY_HOST }}
@@ -144,5 +166,5 @@ jobs:
           BIND_ADDRESS: ${{ inputs.bind_address }}
         run: |
           ssh -i ~/.ssh/deploy_key -p "$PORT" "$USER@$HOST" \
-            "ACTION=$ACTION PROJECT_ID=$PROJECT_ID RELEASE_SHA=$RELEASE_SHA IMAGE_REPOSITORY=$IMAGE_REPOSITORY CONTAINER_PORT=$CONTAINER_PORT HEALTH_PATH=$HEALTH_PATH DEPLOY_ROOT=$DEPLOY_ROOT APP_CPU=$APP_CPU APP_MEMORY=$APP_MEMORY HOST_PORT=$HOST_PORT BIND_ADDRESS=$BIND_ADDRESS IMAGE_ARCHIVE=/tmp/managed-image-${GITHUB_RUN_ID}.tar.gz bash -s" \
+            "ACTION=$ACTION PROJECT_ID=$PROJECT_ID RELEASE_SHA=$RELEASE_SHA IMAGE_REPOSITORY=$IMAGE_REPOSITORY CONTAINER_PORT=$CONTAINER_PORT HEALTH_PATH=$HEALTH_PATH DEPLOY_ROOT=$DEPLOY_ROOT APP_CPU=$APP_CPU APP_MEMORY=$APP_MEMORY HOST_PORT=$HOST_PORT BIND_ADDRESS=$BIND_ADDRESS bash -s" \
             < ops/deploy-managed-container.sh
