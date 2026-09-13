@@ -97,6 +97,8 @@ jobs:
           file: ${{ matrix.dockerfile }}
           platforms: linux/amd64
           push: true
+          provenance: false
+          sbom: false
           tags: |
             crpi-73ce4hnji7xum4zi.cn-heyuan.personal.cr.aliyuncs.com/qiubo-master/${{ matrix.image }}:${{ steps.version.outputs.sha }}
             crpi-73ce4hnji7xum4zi.cn-heyuan.personal.cr.aliyuncs.com/qiubo-master/${{ matrix.image }}:latest
