@@ -101,7 +101,7 @@ pnpm dev
 中央部署还需要在本仓库配置：
 
 - Repository Secret `REPOSITORY_READ_TOKEN`：仅用于读取受管的私有业务仓库；业务仓库为公开仓库时可以省略。
-- `production` Environment Secrets：`DEPLOY_HOST`、`DEPLOY_PORT`、`DEPLOY_USER`、`DEPLOY_SSH_KEY`、`DEPLOY_HOST_KEY`、`TS_OAUTH_CLIENT_ID`、`TS_OAUTH_SECRET`。
+- `production` Environment Secrets：复用中台现有的 `DEPLOY_HOST`、`DEPLOY_PORT`、`DEPLOY_USER`、`DEPLOY_SSH_KEY`、`DEPLOY_HOST_KEY_CURRENT`、`TS_OAUTH_CLIENT_ID`、`TS_OAUTH_SECRET`。
 
 ## 阿里云部署
 
