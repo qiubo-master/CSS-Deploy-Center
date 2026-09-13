@@ -1,0 +1,100 @@
+name: Sync repositories to Aliyun ACR
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+    inputs:
+      repository:
+        description: Repository name to sync; leave empty to sync all
+        required: false
+        type: string
+      force:
+        description: Rebuild even when the commit tag already exists
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: aliyun-acr-repository-sync
+  cancel-in-progress: false
+
+jobs:
+  catalog:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.catalog.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: catalog
+        env:
+          REPOSITORY_FILTER: ${{ inputs.repository || '' }}
+        run: |
+          matrix=$(jq -c --arg repository "$REPOSITORY_FILTER" \
+            '{include: [.images[] | select($repository == "" or .repository == $repository)]}' \
+            ops/acr-images.json)
+          test "$(jq '.include | length' <<<"$matrix")" -gt 0 || {
+            echo "Unknown or non-containerized repository: $REPOSITORY_FILTER"
+            exit 1
+          }
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+
+  sync:
+    needs: catalog
+    runs-on: ubuntu-latest
+    environment: production
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.catalog.outputs.matrix) }}
+    steps:
+      - name: Check out ${{ matrix.repository }}
+        uses: actions/checkout@v4
+        with:
+          repository: qiubo-master/${{ matrix.repository }}
+          ref: ${{ matrix.branch }}
+
+      - name: Resolve image version
+        id: version
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to Aliyun ACR
+        uses: docker/login-action@v3
+        with:
+          registry: registry.cn-heyuan.aliyuncs.com
+          username: ${{ secrets.ACR_USERNAME }}
+          password: ${{ secrets.ACR_PASSWORD }}
+
+      - name: Check whether commit image already exists
+        id: existing
+        env:
+          IMAGE: registry.cn-heyuan.aliyuncs.com/qiubo-master/${{ matrix.image }}
+          SHA: ${{ steps.version.outputs.sha }}
+          FORCE: ${{ inputs.force || 'false' }}
+        run: |
+          if [ "$FORCE" != "true" ] && docker manifest inspect "$IMAGE:$SHA" >/dev/null 2>&1; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "$IMAGE:$SHA already exists"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: docker/setup-buildx-action@v3
+        if: steps.existing.outputs.skip != 'true'
+
+      - name: Build and push ${{ matrix.image }}
+        if: steps.existing.outputs.skip != 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          platforms: linux/amd64
+          push: true
+          tags: |
+            registry.cn-heyuan.aliyuncs.com/qiubo-master/${{ matrix.image }}:${{ steps.version.outputs.sha }}
+            registry.cn-heyuan.aliyuncs.com/qiubo-master/${{ matrix.image }}:latest
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
+

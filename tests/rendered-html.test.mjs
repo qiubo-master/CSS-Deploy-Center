@@ -103,14 +103,20 @@ test("demo deployment and rollback actions are accepted", async () => {
 
 test("metadata and deployment assets are present", async () => {
   const { readFile, access } = await import("node:fs/promises");
-  const [layout, workflow, dockerfile, envExample] = await Promise.all([
+  const [layout, workflow, acrWorkflow, acrCatalog, dockerfile, envExample] = await Promise.all([
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../.github/workflows/deploy.yml", import.meta.url), "utf8"),
+    readFile(new URL("../.github/workflows/sync-acr.yml", import.meta.url), "utf8"),
+    readFile(new URL("../ops/acr-images.json", import.meta.url), "utf8"),
     readFile(new URL("../Dockerfile", import.meta.url), "utf8"),
     readFile(new URL("../.env.example", import.meta.url), "utf8"),
   ]);
   assert.match(layout, /ForgeOps/);
   assert.match(workflow, /Deploy Control Center/);
+  assert.match(workflow, /registry\.cn-heyuan\.aliyuncs\.com/);
+  assert.doesNotMatch(workflow, /docker save|split -b|IMAGE_ARCHIVE/);
+  assert.match(acrWorkflow, /Sync repositories to Aliyun ACR/);
+  assert.equal(JSON.parse(acrCatalog).images.length, 7);
   assert.match(dockerfile, /node:22-alpine/);
   assert.match(envExample, /GITHUB_TOKEN/);
   const manual = await readFile(new URL("../docs/操作手册.md", import.meta.url), "utf8");
