@@ -61,11 +61,16 @@ jobs:
         run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Log in to Aliyun ACR
-        uses: docker/login-action@v3
-        with:
-          registry: registry.cn-heyuan.aliyuncs.com
-          username: ${{ secrets.ACR_USERNAME }}
-          password: ${{ secrets.ACR_PASSWORD }}
+        env:
+          ACR_USERNAME: ${{ secrets.ACR_USERNAME }}
+          ACR_PASSWORD: ${{ secrets.ACR_PASSWORD }}
+        run: |
+          acr_username=$(printf '%s' "$ACR_USERNAME" | tr -d '\r\n')
+          acr_password=$(printf '%s' "$ACR_PASSWORD" | tr -d '\r\n')
+          echo "ACR credential lengths: username=${#acr_username}, password=${#acr_password}"
+          test -n "$acr_username" && test -n "$acr_password"
+          printf '%s' "$acr_password" | docker login registry.cn-heyuan.aliyuncs.com \
+            --username "$acr_username" --password-stdin
 
       - name: Check whether commit image already exists
         id: existing
@@ -97,4 +102,3 @@ jobs:
             registry.cn-heyuan.aliyuncs.com/qiubo-master/${{ matrix.image }}:latest
           cache-from: type=gha,scope=${{ matrix.image }}
           cache-to: type=gha,mode=max,scope=${{ matrix.image }}
-

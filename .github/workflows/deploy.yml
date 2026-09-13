@@ -32,7 +32,12 @@ jobs:
           ACR_PASSWORD: ${{ secrets.ACR_PASSWORD }}
           IMAGE: registry.cn-heyuan.aliyuncs.com/qiubo-master/css-deploy-center
         run: |
-          printf '%s' "$ACR_PASSWORD" | docker login registry.cn-heyuan.aliyuncs.com -u "$ACR_USERNAME" --password-stdin
+          acr_username=$(printf '%s' "$ACR_USERNAME" | tr -d '\r\n')
+          acr_password=$(printf '%s' "$ACR_PASSWORD" | tr -d '\r\n')
+          echo "ACR credential lengths: username=${#acr_username}, password=${#acr_password}"
+          test -n "$acr_username" && test -n "$acr_password"
+          printf '%s' "$acr_password" | docker login registry.cn-heyuan.aliyuncs.com \
+            --username "$acr_username" --password-stdin
           docker build -t "$IMAGE:${GITHUB_SHA}" -t "$IMAGE:latest" .
           docker push "$IMAGE:${GITHUB_SHA}"
           docker push "$IMAGE:latest"
