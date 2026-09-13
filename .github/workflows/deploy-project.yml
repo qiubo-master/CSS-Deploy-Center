@@ -61,6 +61,12 @@ jobs:
               echo "health_path=/api/health" >> "$GITHUB_OUTPUT"
               echo "deploy_root=/opt/css-deploy-center/managed/ai-wms" >> "$GITHUB_OUTPUT"
               ;;
+            ai-ops:qiubo-master/AI_OPS)
+              echo "image_repository=crpi-73ce4hnji7xum4zi.cn-heyuan.personal.cr.aliyuncs.com/qiubo-master/ai-ops" >> "$GITHUB_OUTPUT"
+              echo "container_port=3000" >> "$GITHUB_OUTPUT"
+              echo "health_path=/api/health" >> "$GITHUB_OUTPUT"
+              echo "deploy_root=/opt/css-deploy-center/managed/ai-ops" >> "$GITHUB_OUTPUT"
+              ;;
             *) echo "Project/repository is not allow-listed" >&2; exit 1 ;;
           esac
 

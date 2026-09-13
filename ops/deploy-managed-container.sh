@@ -23,6 +23,12 @@ validate() {
       [[ "$HEALTH_PATH" == "/api/health" ]]
       [[ "$DEPLOY_ROOT" == "/opt/css-deploy-center/managed/ai-wms" ]]
       ;;
+    ai-ops)
+      [[ "$IMAGE_REPOSITORY" == "crpi-73ce4hnji7xum4zi.cn-heyuan.personal.cr.aliyuncs.com/qiubo-master/ai-ops" ]]
+      [[ "$CONTAINER_PORT" == "3000" ]]
+      [[ "$HEALTH_PATH" == "/api/health" ]]
+      [[ "$DEPLOY_ROOT" == "/opt/css-deploy-center/managed/ai-ops" ]]
+      ;;
     *) echo "Unsupported managed project: $PROJECT_ID" >&2; exit 1 ;;
   esac
 }
@@ -37,7 +43,28 @@ start_release() {
   local target="$1"
   load_release "$target"
   local env_args=()
+  local network_args=()
   [[ ! -s "$DEPLOY_ROOT/shared/.env" ]] || env_args+=(--env-file "$DEPLOY_ROOT/shared/.env")
+  if [[ "$PROJECT_ID" == "ai-ops" ]]; then
+    if [[ ! -s "$DEPLOY_ROOT/shared/.env" ]]; then
+      local database_password
+      database_password=$(openssl rand -hex 32)
+      cat > "$DEPLOY_ROOT/shared/.env" <<EOF
+POSTGRES_DB=ai_ops
+POSTGRES_USER=ai_ops
+POSTGRES_PASSWORD=$database_password
+DATABASE_URL=postgresql://ai_ops:$database_password@forgeops-ai-ops-db:5432/ai_ops
+EOF
+      chmod 600 "$DEPLOY_ROOT/shared/.env"
+      env_args=(--env-file "$DEPLOY_ROOT/shared/.env")
+    fi
+    docker network create forgeops-ai-ops >/dev/null 2>&1 || true
+    docker rm -f forgeops-ai-ops-db >/dev/null 2>&1 || true
+    docker run -d --name forgeops-ai-ops-db --restart unless-stopped \
+      --network forgeops-ai-ops --env-file "$DEPLOY_ROOT/shared/.env" \
+      -v ai_ops_postgres_data:/var/lib/postgresql/data postgres:17-alpine >/dev/null
+    network_args=(--network forgeops-ai-ops)
+  fi
   docker rm -f "forgeops-$PROJECT_ID" >/dev/null 2>&1 || true
   docker run -d \
     --name "forgeops-$PROJECT_ID" \
@@ -45,6 +72,7 @@ start_release() {
     --label "com.docker.compose.project=$PROJECT_ID" \
     --cpus "$APP_CPU" \
     --memory "$APP_MEMORY" \
+    "${network_args[@]}" \
     -p "$BIND_ADDRESS:$HOST_PORT:$CONTAINER_PORT" \
     "${env_args[@]}" \
     "$IMAGE_REPOSITORY:$IMAGE_TAG" >/dev/null
