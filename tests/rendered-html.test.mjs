@@ -26,6 +26,7 @@ test("server-renders the CI/CD control center", async () => {
   assert.match(html, /访问项目/);
   assert.match(html, /操作手册/);
   assert.match(html, /序章自媒体中台/);
+  assert.match(html, /汽车后市场 Ontology/);
   assert.match(html, /WordGame 单词闯关/);
   assert.doesNotMatch(html, /AI供应链智能备货|AI运营/);
   assert.match(html, /项目管理/);
@@ -66,7 +67,11 @@ test("control-center API returns a usable demo dashboard", async () => {
   const body = await response.json();
   assert.equal(body.mode, "demo");
   assert.equal(body.project.repository, "qiubo-master/Media");
-  assert.equal(body.projects.length, 6);
+  assert.equal(body.projects.length, 7);
+  const ontology = body.projects.find((project) => project.repository === "qiubo-master/Ontology");
+  assert.equal(ontology.branch, "master");
+  assert.match(ontology.endpoint, /:8090$/);
+  assert.ok(body.servers[0].projectIds.includes("ontology"));
   const wordGame = body.projects.find((project) => project.repository === "qiubo-master/WordGame");
   assert.equal(wordGame.branch, "master");
   assert.match(wordGame.manualUrl, /deploy-cloudbase\.md$/);
@@ -113,10 +118,10 @@ test("metadata and deployment assets are present", async () => {
   ]);
   assert.match(layout, /ForgeOps/);
   assert.match(workflow, /Deploy Control Center/);
-  assert.match(workflow, /registry\.cn-heyuan\.aliyuncs\.com/);
+  assert.match(workflow, /crpi-73ce4hnji7xum4zi\.cn-heyuan\.personal\.cr\.aliyuncs\.com/);
   assert.doesNotMatch(workflow, /docker save|split -b|IMAGE_ARCHIVE/);
   assert.match(acrWorkflow, /Sync repositories to Aliyun ACR/);
-  assert.equal(JSON.parse(acrCatalog).images.length, 7);
+  assert.equal(JSON.parse(acrCatalog).images.length, 8);
   assert.match(dockerfile, /node:22-alpine/);
   assert.match(envExample, /GITHUB_TOKEN/);
   const manual = await readFile(new URL("../docs/操作手册.md", import.meta.url), "utf8");
