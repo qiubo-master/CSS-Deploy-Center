@@ -79,8 +79,8 @@ test("control-center API returns a usable demo dashboard", async () => {
   const wordGame = body.projects.find((project) => project.repository === "qiubo-master/WordGame");
   assert.equal(wordGame.branch, "master");
   assert.match(wordGame.manualUrl, /deploy-cloudbase\.md$/);
-  assert.equal(body.projects.find((project) => project.id === "ai-wms").projectUrl, "https://github.com/qiubo-master/AI_WMS");
-  assert.equal(body.projects.find((project) => project.id === "ai-ops").projectUrl, "https://github.com/qiubo-master/AI_OPS");
+  assert.equal(body.projects.find((project) => project.id === "ai-wms").projectUrl, "http://100.103.132.88:8102");
+  assert.equal(body.projects.find((project) => project.id === "ai-ops").projectUrl, "http://100.103.132.88:8101");
   assert.ok(body.projects.some((project) => project.repository === "qiubo-master/GFM"));
   const otel = body.projects.find((project) => project.repository === "qiubo-master/Otel");
   assert.equal(otel.branch, "main");

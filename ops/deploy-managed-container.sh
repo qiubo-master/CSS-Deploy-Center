@@ -29,6 +29,12 @@ validate() {
       [[ "$HEALTH_PATH" == "/api/health" ]]
       [[ "$DEPLOY_ROOT" == "/opt/css-deploy-center/managed/ai-ops" ]]
       ;;
+    css)
+      [[ "$IMAGE_REPOSITORY" == "crpi-73ce4hnji7xum4zi.cn-heyuan.personal.cr.aliyuncs.com/qiubo-master/css" ]]
+      [[ "$CONTAINER_PORT" == "8000" ]]
+      [[ "$HEALTH_PATH" == "/api/v1/health" ]]
+      [[ "$DEPLOY_ROOT" == "/opt/css-deploy-center/managed/css" ]]
+      ;;
     *) echo "Unsupported managed project: $PROJECT_ID" >&2; exit 1 ;;
   esac
 }

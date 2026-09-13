@@ -67,6 +67,12 @@ jobs:
               echo "health_path=/api/health" >> "$GITHUB_OUTPUT"
               echo "deploy_root=/opt/css-deploy-center/managed/ai-ops" >> "$GITHUB_OUTPUT"
               ;;
+            css:qiubo-master/CSS)
+              echo "image_repository=crpi-73ce4hnji7xum4zi.cn-heyuan.personal.cr.aliyuncs.com/qiubo-master/css" >> "$GITHUB_OUTPUT"
+              echo "container_port=8000" >> "$GITHUB_OUTPUT"
+              echo "health_path=/api/v1/health" >> "$GITHUB_OUTPUT"
+              echo "deploy_root=/opt/css-deploy-center/managed/css" >> "$GITHUB_OUTPUT"
+              ;;
             *) echo "Project/repository is not allow-listed" >&2; exit 1 ;;
           esac
 
@@ -75,6 +81,10 @@ jobs:
     if: inputs.action == 'deploy'
     runs-on: ubuntu-latest
     steps:
+      - name: Check out deployment tooling
+        uses: actions/checkout@v4
+        with:
+          path: deploy-center
       - name: Check out immutable project source
         uses: actions/checkout@v4
         with:
@@ -84,16 +94,28 @@ jobs:
           path: source
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.13"
+          python-version: ${{ inputs.project_id == 'css' && '3.11' || '3.13' }}
       - name: Test project
         working-directory: source
-        run: python -m unittest discover -s tests -v
+        env:
+          PROJECT_ID: ${{ inputs.project_id }}
+        run: |
+          if [[ "$PROJECT_ID" == "css" ]]; then
+            python -m pip install 'source/local-demo[dev]'
+            python -m pytest source/local-demo/tests -q
+          else
+            python -m unittest discover -s tests -v
+          fi
       - name: Build immutable image
         env:
           IMAGE_REPOSITORY: ${{ needs.validate.outputs.image_repository }}
           TARGET_SHA: ${{ inputs.target_sha }}
         run: |
-          docker build -t "$IMAGE_REPOSITORY:$TARGET_SHA" source
+          if [[ "${{ inputs.project_id }}" == "css" ]]; then
+            docker build -f deploy-center/ops/Dockerfile.css-local-demo -t "$IMAGE_REPOSITORY:$TARGET_SHA" source/local-demo
+          else
+            docker build -t "$IMAGE_REPOSITORY:$TARGET_SHA" source
+          fi
           docker save "$IMAGE_REPOSITORY:$TARGET_SHA" | gzip -1 > managed-image.tar.gz
       - uses: actions/upload-artifact@v4
         with:
