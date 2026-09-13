@@ -121,6 +121,10 @@ if healthy; then
 fi
 
 docker logs --tail=100 "forgeops-$PROJECT_ID" || true
+if [[ "$PROJECT_ID" == "ai-ops" ]]; then
+  docker logs --tail=100 forgeops-ai-ops-db || true
+  docker inspect forgeops-ai-ops-db --format 'database={{.State.Status}} exit={{.State.ExitCode}} error={{.State.Error}}' || true
+fi
 if [[ -n "$PREVIOUS" && -s "$PREVIOUS/deploy.env" ]]; then
   echo "Health check failed; restoring $PREVIOUS" >&2
   start_release "$PREVIOUS"
