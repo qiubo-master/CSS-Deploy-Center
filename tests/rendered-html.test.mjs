@@ -144,6 +144,7 @@ test("metadata and deployment assets are present", async () => {
   assert.match(otelWorkflow, /Deploy Otel Platform/);
   assert.match(controlCenterRoute, /dedicatedOtelDeployment/);
   assert.match(controlCenterRoute, /workflowFile/);
+  assert.match(controlCenterRoute, /selected\.workflow === "deploy-project\.yml" \? centralWorkflow : selected\.workflow/);
   assert.match(managedScript, /\/api\/health/);
   assert.match(managedScript, /restoring \$PREVIOUS/);
   assert.match(acrWorkflow, /Sync repositories to Aliyun ACR/);

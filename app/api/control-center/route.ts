@@ -73,7 +73,7 @@ export async function GET(request: NextRequest) {
   const centralRepository = process.env.DEPLOY_RUNNER_GITHUB_REPOSITORY ?? "qiubo-master/CSS-Deploy-Center";
   const centralWorkflow = process.env.DEPLOY_RUNNER_GITHUB_WORKFLOW_FILE ?? "deploy-project.yml";
   const runRepository = selected.centralDeployment ? centralRepository : selected.repository;
-  const runWorkflow = selected.centralDeployment ? centralWorkflow : selected.workflow;
+  const runWorkflow = selected.centralDeployment && selected.workflow === "deploy-project.yml" ? centralWorkflow : selected.workflow;
   const [runOwner, runRepo] = runRepository.split("/");
   const health = await checkHealth(selectedResolved.healthUrl);
   const monitoredServers = await Promise.all(targets.map(async (target) => {
