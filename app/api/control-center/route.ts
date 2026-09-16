@@ -222,16 +222,22 @@ export async function POST(request: NextRequest) {
   const centralBranch = process.env.DEPLOY_RUNNER_GITHUB_BRANCH ?? "master";
   const dispatchRepository = project.centralDeployment ? centralRepository : project.repository;
   const [owner, repo] = dispatchRepository.split("/");
+  const dedicatedOtelDeployment = project.centralDeployment && project.workflow === "deploy-otel.yml";
+  const workflowFile = project.centralDeployment && project.workflow === "deploy-project.yml" ? centralWorkflow : project.workflow;
+  if (dedicatedOtelDeployment && input.action === "rollback") {
+    return NextResponse.json({ message: "Otel 专用流水线暂不支持回滚，请选择发布最新版本" }, { status: 400 });
+  }
   const workflowAction = input.action === "release" ? "deploy" : input.action;
-  const workflowInputs: Record<string, string> = { action: workflowAction };
+  const workflowInputs: Record<string, string> = dedicatedOtelDeployment ? {} : { action: workflowAction };
   if (project.centralDeployment) {
     const [projectOwner, projectRepo] = project.repository.split("/");
     const targetResponse = await fetch(`https://api.github.com/repos/${projectOwner}/${projectRepo}/commits/${encodeURIComponent(input.branch || project.branch)}`, { headers: githubHeaders(), cache: "no-store" });
     if (!targetResponse.ok) return NextResponse.json({ message: `无法读取目标项目版本（GitHub ${targetResponse.status}）` }, { status: 502 });
     const targetCommit = await targetResponse.json();
-    Object.assign(workflowInputs, { project_id: project.id, repository: project.repository, target_sha: String(targetCommit.sha) });
+    if (dedicatedOtelDeployment) Object.assign(workflowInputs, { target_sha: String(targetCommit.sha) });
+    else Object.assign(workflowInputs, { project_id: project.id, repository: project.repository, target_sha: String(targetCommit.sha) });
   }
-  if (project.resourceManaged) Object.assign(workflowInputs, {
+  if (project.resourceManaged && !dedicatedOtelDeployment) Object.assign(workflowInputs, {
     resource_profile: profileName,
     app_cpu: profiles[profileName].cpu,
     app_memory: profiles[profileName].memory,
@@ -240,7 +246,7 @@ export async function POST(request: NextRequest) {
     bind_address: input.exposure === "gateway" ? "127.0.0.1" : "0.0.0.0",
   });
 
-  const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/actions/workflows/${project.centralDeployment ? centralWorkflow : project.workflow}/dispatches`, {
+  const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/actions/workflows/${workflowFile}/dispatches`, {
     method: "POST",
     headers: githubHeaders(),
     body: JSON.stringify({ ref: project.centralDeployment ? centralBranch : input.branch || project.branch, inputs: workflowInputs }),

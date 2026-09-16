@@ -118,10 +118,12 @@ test("demo deployment and rollback actions are accepted", async () => {
 
 test("metadata and deployment assets are present", async () => {
   const { readFile, access } = await import("node:fs/promises");
-  const [layout, workflow, managedWorkflow, managedScript, acrWorkflow, acrCatalog, dockerfile, envExample] = await Promise.all([
+  const [layout, workflow, managedWorkflow, otelWorkflow, controlCenterRoute, managedScript, acrWorkflow, acrCatalog, dockerfile, envExample] = await Promise.all([
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../.github/workflows/deploy.yml", import.meta.url), "utf8"),
     readFile(new URL("../.github/workflows/deploy-project.yml", import.meta.url), "utf8"),
+    readFile(new URL("../.github/workflows/deploy-otel.yml", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/control-center/route.ts", import.meta.url), "utf8"),
     readFile(new URL("../ops/deploy-managed-container.sh", import.meta.url), "utf8"),
     readFile(new URL("../.github/workflows/sync-acr.yml", import.meta.url), "utf8"),
     readFile(new URL("../ops/acr-images.json", import.meta.url), "utf8"),
@@ -139,6 +141,9 @@ test("metadata and deployment assets are present", async () => {
   assert.match(managedWorkflow, /docker push/);
   assert.match(managedWorkflow, /docker pull/);
   assert.doesNotMatch(managedWorkflow, /\bscp\b/);
+  assert.match(otelWorkflow, /Deploy Otel Platform/);
+  assert.match(controlCenterRoute, /dedicatedOtelDeployment/);
+  assert.match(controlCenterRoute, /workflowFile/);
   assert.match(managedScript, /\/api\/health/);
   assert.match(managedScript, /restoring \$PREVIOUS/);
   assert.match(acrWorkflow, /Sync repositories to Aliyun ACR/);
